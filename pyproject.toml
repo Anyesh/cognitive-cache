@@ -1,0 +1,31 @@
+[project]
+name = "cognitive-cache"
+version = "0.1.0"
+description = "Optimal context orchestration for LLMs"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "tiktoken>=0.7.0",
+    "scikit-learn>=1.4.0",
+    "networkx>=3.2",
+    "numpy>=1.26.0",
+]
+
+[project.optional-dependencies]
+benchmark = [
+    "anthropic>=0.40.0",
+    "openai>=1.50.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.17,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
