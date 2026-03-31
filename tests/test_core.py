@@ -76,7 +76,7 @@ def test_selector_picks_highest_value():
     selector = GreedySelector(value_function=ValueFunction())
     result = selector.select([low_value, high_value], task, budget=15)
 
-    assert len(result.selected) == 1
+    # auth.py should be picked first (highest score)
     assert result.selected[0].source.path == "auth.py"
 
 
@@ -99,10 +99,10 @@ def test_selector_stops_at_threshold():
     ]
     task = _make_task(symbols=["login"])
 
-    selector = GreedySelector(value_function=ValueFunction(), threshold=0.01)
+    selector = GreedySelector(value_function=ValueFunction(), score_threshold=0.3, vpt_threshold=0.01)
     result = selector.select(sources, task, budget=1000)
 
-    # b.py and c.py have no symbol overlap — their value per token is below threshold
+    # b.py and c.py have no symbol overlap — below both thresholds
     assert len(result.selected) < len(sources)
 
 

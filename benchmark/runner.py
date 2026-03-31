@@ -44,15 +44,43 @@ class RunResult:
 
 
 def _extract_task_symbols(title: str, body: str, sources) -> frozenset[str]:
+    """Extract symbols using exact and selective substring matching.
+
+    Strategy:
+    1. Exact match: symbol name appears verbatim in issue text (strongest)
+    2. Substring match: issue words (6+ chars) appear in symbol names
+       Short common words like 'error', 'class', 'test' cause too many false matches.
+    """
     all_symbols = set()
     for s in sources:
         all_symbols.update(s.symbols)
 
     text = f"{title} {body}".lower()
+    import re
+    # Only use longer words for substring matching to avoid noise
+    task_words_long = set(re.findall(r"\b[a-z_][a-z0-9_]{5,}\b", text))
+    # Common words that match everywhere — exclude them
+    stop_words = {
+        "return", "import", "should", "string", "number", "before", "after",
+        "called", "values", "object", "update", "create", "delete", "method",
+        "function", "default", "option", "options", "config", "module",
+        "result", "response", "request", "handler", "callback", "parameter",
+    }
+    task_words_long -= stop_words
+
     matches = set()
     for sym in all_symbols:
-        if sym.lower() in text:
+        sym_lower = sym.lower()
+        # Exact match: full symbol name in issue text
+        if sym_lower in text and len(sym_lower) >= 4:
             matches.add(sym)
+            continue
+        # Substring match: long task words in symbol name
+        for word in task_words_long:
+            if word in sym_lower:
+                matches.add(sym)
+                break
+
     return frozenset(matches)
 
 

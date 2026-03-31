@@ -30,12 +30,12 @@ from cognitive_cache.indexer.graph_builder import DependencyGraph
 class WeightConfig:
     """Weights for each signal. These are the tunable knobs."""
 
-    symbol_overlap: float = 0.35
-    graph_distance: float = 0.20
-    change_recency: float = 0.15
-    redundancy: float = 0.20
-    embedding_sim: float = 0.05
-    file_role_prior: float = 0.05
+    symbol_overlap: float = 0.40
+    graph_distance: float = 0.15
+    change_recency: float = 0.10
+    redundancy: float = 0.10
+    embedding_sim: float = 0.15
+    file_role_prior: float = 0.10
 
 
 class ValueFunction:
