@@ -1,0 +1,313 @@
+[
+  {
+    "repo": "pallets/flask",
+    "repo_url": "https://github.com/pallets/flask.git",
+    "issue_number": 5928,
+    "title": "all teardown callbacks are called despite errors",
+    "body": "Previously, Flask documented that teardown callbacks must not fail. Now, all callbacks will be called, and any errors are collected to be raised at the end. This applies to app and request teardown callbacks and signals. On Python >= 3.11, this will result in an `ExceptionGroup` each for app and request teardown, collected in an `ExceptionGroup` for overall teardown. On 3.10, the first collected error is raise, which basically matches what happens now.\r\n\r\nAlso adjusts a bunch of tests to clean u",
+    "fixed_files": [
+      "src/flask/app.py",
+      "src/flask/ctx.py",
+      "src/flask/helpers.py",
+      "tests/test_appctx.py",
+      "tests/test_basic.py",
+      "tests/test_blueprints.py",
+      "tests/test_helpers.py",
+      "tests/test_testing.py"
+    ],
+    "fix_commit": "c34d6e81fd8e405e6d4178bf24b364918811ef17",
+    "base_commit": "7b0088693ece1bd3a9238a6fdf56ed8df7a4d43b"
+  },
+  {
+    "repo": "pallets/flask",
+    "repo_url": "https://github.com/pallets/flask.git",
+    "issue_number": 5917,
+    "title": "fix provide_automatic_options override",
+    "body": "`OPTIONS` is added correctly whenever `provide_automatic_options` is set. Previously, it was only added if the argument was not passed and was not set as an attribute; it could only be disabled, not enabled.\r\n\r\nAlso cleans up the tests about options. Fixes some other tests that were inadvertently adding duplicate routes.\r\n\r\nfixes #5916 ",
+    "fixed_files": [
+      "src/flask/sansio/app.py",
+      "tests/test_basic.py",
+      "tests/test_blueprints.py",
+      "tests/test_cli.py",
+      "tests/test_views.py"
+    ],
+    "fix_commit": "12e95c93b488725f80753f34b2e0d24838ca4646",
+    "base_commit": "d3b78fd18a8d9e224cb9ef58a23cec9b1ffc9ce9"
+  },
+  {
+    "repo": "pallets/flask",
+    "repo_url": "https://github.com/pallets/flask.git",
+    "issue_number": 5899,
+    "title": "deprecate `should_ignore_error`",
+    "body": "closes #5816 ",
+    "fixed_files": [
+      "src/flask/app.py",
+      "src/flask/sansio/app.py"
+    ],
+    "fix_commit": "4b8bde97d4fa3486e18dce21c3c5f75570d50164",
+    "base_commit": "9b74a90dd3c47f792734823e8793ac36f38bc4dd"
+  },
+  {
+    "repo": "psf/requests",
+    "repo_url": "https://github.com/psf/requests.git",
+    "issue_number": 7309,
+    "title": "Fix malformed value parsing for Content-Type",
+    "body": "This PR addresses https://github.com/psf/requests/issues/6646 by cleaning up `_parse_content_type_header`. Instead of setting a default that we can't use in practice, we now skip value assignment completely if the value is malformed. Every RFC from 1521 to 9110 is clear that an `=` is required for a valid parameter. If it doesn't exist, we need to ignore it.",
+    "fixed_files": [
+      "src/requests/utils.py",
+      "tests/test_utils.py"
+    ],
+    "fix_commit": "f0198e6dfc431a2293dc16e1b1e8fcddc910a7f3",
+    "base_commit": "7407309c8a8a73aa2f4337184025d440bbedab7a"
+  },
+  {
+    "repo": "psf/requests",
+    "repo_url": "https://github.com/psf/requests.git",
+    "issue_number": 7308,
+    "title": "Fix cosmetic header validity parsing regex",
+    "body": "Credit to @ParzivalHack for reporting this through our security channel. This PR fixes what is now a cosmetic guard for header validity. It was originally introduced before the standard library handled line folding in http.client to protect older versions of Python. Now it serves as a cleaner error layer for callers of Requests.\r\n\r\nThis PR moves the end of regex from `$` to `\\Z` to capture any end-of-line LF characters. Those are explicitly ignored by `$` for convenience and our tests missed it.",
+    "fixed_files": [
+      "src/requests/_internal_utils.py",
+      "tests/test_requests.py"
+    ],
+    "fix_commit": "bc7dd0fc4d56e808bcdd85ac2d797b3107c89259",
+    "base_commit": "7407309c8a8a73aa2f4337184025d440bbedab7a"
+  },
+  {
+    "repo": "pallets/click",
+    "repo_url": "https://github.com/pallets/click.git",
+    "issue_number": 3225,
+    "title": "Fix callable ``flag_value`` being instantiated when used as a default",
+    "body": "This fix issue #3121, where a `flag_value` set to a class produce an instance of that class in the particular case that it is explicitly set as the default.\r\n\r\nThe fix consist in lazily resolving the default value at the time of use, with a branch dedicated to callables.\r\n\r\nI extended the unittests to `default_map` to demonstrate the current state of callable presence in them.",
+    "fixed_files": [
+      "src/click/core.py",
+      "tests/test_defaults.py",
+      "tests/test_options.py"
+    ],
+    "fix_commit": "5850ef97230f84c74d0234ab0f30f23b398a6eee",
+    "base_commit": "ae46cfd6bc997804893adc799589248eadcdbc29"
+  },
+  {
+    "repo": "Textualize/rich",
+    "repo_url": "https://github.com/Textualize/rich.git",
+    "issue_number": 4006,
+    "title": "fix for infinite loop in split_graphemes",
+    "body": "Fix for https://github.com/Textualize/rich/issues/3958",
+    "fixed_files": [
+      "rich/cells.py",
+      "tests/test_cells.py"
+    ],
+    "fix_commit": "7338cb9dafd0d0e916585f191ae505b3e602bb51",
+    "base_commit": "27701029082052c6541031b6f139097230253900"
+  },
+  {
+    "repo": "fastify/fastify",
+    "repo_url": "https://github.com/fastify/fastify.git",
+    "issue_number": 6613,
+    "title": "fix: restore trustProxy function for number and string types, add null check for socketAddr",
+    "body": "Fixes #6606\n\n## Description\n\nThe regression was introduced when the proxy trust function was changed to check for null addresses. This caused issues with IISNode on Windows where  may be undefined/null with .\n\n## Changes\n\n- Removed the `a != null` check from number and string trust proxy functions\n- Added explicit null checks in host and protocol getters\n- Added tests for `trustProxy: 1` with undefined and null socket remoteAddress\n\n## Testing\n\nAll existing tests pass, plus new tests for the IIS",
+    "fixed_files": [
+      "lib/request.js",
+      "test/trust-proxy.test.js"
+    ],
+    "fix_commit": "8dee9be05ebf683cd212aeff1d294f6ea1ec405c",
+    "base_commit": "d457aeda8611777389c7e4713a288eb7ddb9a389"
+  },
+  {
+    "repo": "fastify/fastify",
+    "repo_url": "https://github.com/fastify/fastify.git",
+    "issue_number": 6021,
+    "title": "test: fix flaky",
+    "body": "Our `main` tests are not stable:\r\n\r\n<img width=\"987\" alt=\"image\" src=\"https://github.com/user-attachments/assets/989fe322-d1c6-479c-a9cc-03ed118b5a56\" />\r\n\r\nThis PR clean up a bit the flaky test and adds a small utility to avoid the `pending` stuff to wait for multiple async functions\r\n\r\nUnblock #6013 ",
+    "fixed_files": [
+      "test/toolkit.js",
+      "test/trust-proxy.test.js"
+    ],
+    "fix_commit": "f2b4f16d5868867f2388760816ab181fde6984f7",
+    "base_commit": "97df2dfbd9411c3a68fc2d8107f13cf32f5f797f"
+  },
+  {
+    "repo": "fastify/fastify",
+    "repo_url": "https://github.com/fastify/fastify.git",
+    "issue_number": 6013,
+    "title": "fix: double hook execution",
+    "body": "Continuing the discussion about this issue:\r\n- https://github.com/fastify/fastify/issues/4959\r\n- Previous tentative: https://github.com/fastify/fastify/pull/4963 (rollback https://github.com/fastify/fastify/pull/5008)\r\n\r\nTo replicate the issue:\r\n\r\n1. follow these instructions: https://github.com/fastify/fastify/issues/4959#issuecomment-2631937444\r\n2. run `npx autocannon -m PUT -c 1 -d 1 http://localhost:3000/ -b '{ \"test\": \"me\" }' -H \"Content-Type: application/json\"` (it does not happen always, ",
+    "fixed_files": [
+      "lib/wrapThenable.js",
+      "test/issue-4959.test.js"
+    ],
+    "fix_commit": "0dfa46c466875ca1e2338c5ed0baf1359174fbcb",
+    "base_commit": "f2b4f16d5868867f2388760816ab181fde6984f7"
+  },
+  {
+    "repo": "fastify/fastify",
+    "repo_url": "https://github.com/fastify/fastify.git",
+    "issue_number": 6026,
+    "title": "fix: wrong reply return type",
+    "body": "Fixes https://github.com/fastify/fastify/issues/6020\r\n\r\n#### Checklist\r\n\r\n- [x] run ~~`npm run test`~~ `npm run test:typescript`\r\n- [x] tests and/or benchmarks are included\r\n- [ ] documentation is changed or added\r\n- [x] commit message and code follows the [Developer's Certification of Origin](https://github.com/fastify/.github/blob/main/CONTRIBUTING.md#developers-certificate-of-origin-11)\r\n      and the [Code of conduct](https://github.com/fastify/.github/blob/main/CODE_OF_CONDUCT.md)\r\n",
+    "fixed_files": [
+      "test/types/type-provider.test-d.ts",
+      "types/type-provider.d.ts"
+    ],
+    "fix_commit": "2c0be02b396bdd37bc34ee49356003be3c5a3f95",
+    "base_commit": "6cbcfa7d82aaf25c7e53804e2a024c531d15c4d0"
+  },
+  {
+    "repo": "fastify/fastify",
+    "repo_url": "https://github.com/fastify/fastify.git",
+    "issue_number": 6030,
+    "title": "fix: clear `[kState].readyPromise` for garbage collection",
+    "body": "Disclaimer: this is committed with `--no-verify` because penultimate test fails locally with `EAFNOSUPPORT`.\r\n\r\n#### Checklist\r\n\r\n- [ ] run `npm run test` and `npm run benchmark`\r\n- [x] tests and/or benchmarks are included\r\n- [ ] documentation is changed or added\r\n- [x] commit message and code follows the [Developer's Certification of Origin](https://github.com/fastify/.github/blob/main/CONTRIBUTING.md#developers-certificate-of-origin-11)\r\n      and the [Code of conduct](https://github.com/fasti",
+    "fixed_files": [
+      "fastify.js",
+      "test/fastify-instance.test.js"
+    ],
+    "fix_commit": "9dc6486b659420bb213fe93fde2432f74e1905ec",
+    "base_commit": "2c0be02b396bdd37bc34ee49356003be3c5a3f95"
+  },
+  {
+    "repo": "fastify/fastify",
+    "repo_url": "https://github.com/fastify/fastify.git",
+    "issue_number": 6064,
+    "title": "fix: treat space as a delimiter in content-type parsing",
+    "body": "Follow-up from https://github.com/fastify/fastify/security/advisories/GHSA-mg2h-6x62-wpwc",
+    "fixed_files": [
+      "lib/validation.js",
+      "test/schema-validation.test.js"
+    ],
+    "fix_commit": "f3d2bcb3963cd570a582e5d39aab01a9ae692fe4",
+    "base_commit": "9b1cf06987c1b00c90e27ed921a2779edd2f609b"
+  },
+  {
+    "repo": "tiangolo/fastapi",
+    "repo_url": "https://github.com/tiangolo/fastapi.git",
+    "issue_number": 15139,
+    "title": "\u2b06\ufe0f Increase lower bound to `pydantic >=2.9.0.` and fix the test suite",
+    "body": "Our CI is intended to test the lowest ranges of our dependency pins as well as the highest, but it turns out this wasn't actually working well for Pydantic, and our lowest \"supported\" version wasn't actually being tested. Cf more digging by Yurii [here](https://github.com/fastapi/fastapi/pull/15101#discussion_r2943355570).\r\n\r\nThis PR ensures that the lowest Pydantic supported version is installed when we're testing the lower bounds. From the first commit on this PR, you can see that it fails for",
+    "fixed_files": [
+      "tests/test_schema_compat_pydantic_v2.py",
+      "tests/test_union_body_discriminator.py"
+    ],
+    "fix_commit": "aeb9f4bb854d030803e2d13cdb64dd0bc5843f00",
+    "base_commit": "64feaec80244578bbdabe51e866bcfad1df8b708"
+  },
+  {
+    "repo": "pallets/jinja",
+    "repo_url": "https://github.com/pallets/jinja.git",
+    "issue_number": 1665,
+    "title": "Fix bug involving calling set on a template parameter within all branches of an if block",
+    "body": "This fixes a bug where calling `{% set %}` in all 3 branches of an `{% if %}` block could result in the parameter being undefined sometimes. If the `{% set %}` call was not done in all branches or it was done outside of an `{% if %}` block then the bug would not appear. This was determined to be a bad assumption being made by the ID tracking for variables within the template loader where if the `{% set %}` occurred in all branches then it was not going to be a previously defined variable.\r\n\r\nFix",
+    "fixed_files": [
+      "src/jinja2/idtracking.py",
+      "tests/test_regression.py"
+    ],
+    "fix_commit": "c8fdce1e0333f1122b244b03a48535fdd7b03d91",
+    "base_commit": "fbc3a696c729d177340cc089531de7e2e5b6f065"
+  },
+  {
+    "repo": "pallets/jinja",
+    "repo_url": "https://github.com/pallets/jinja.git",
+    "issue_number": 1852,
+    "title": "fix f-string syntax error in code generation",
+    "body": "I've fixed a bug that caused an f-string syntax error in the template compilation when a template, that imports a macro, contains curly braces in its name. The bug was caused by the code-generation of an f-string in which the template name is inserted, and when the template name contains curly braces and the generated code gets executed, Python treats the curly braces as f-string braces. I've changed the code-generation to construct the string differently, such that the affected substring is not",
+    "fixed_files": [
+      "src/jinja2/compiler.py",
+      "tests/test_compile.py"
+    ],
+    "fix_commit": "767b23617628419ae3709ccfb02f9602ae9fe51f",
+    "base_commit": "48b0687e05a5466a91cd5812d604fa37ad0943b4"
+  },
+  {
+    "repo": "pallets/jinja",
+    "repo_url": "https://github.com/pallets/jinja.git",
+    "issue_number": 1663,
+    "title": "`FileSystemLoader` include paths in error",
+    "body": "<!--\r\nBefore opening a PR, open a ticket describing the issue or feature the PR will address. Follow the steps in CONTRIBUTING.rst.\r\n\r\nReplace this comment with a description of the change. Describe how it addresses the linked ticket.\r\n-->\r\n\r\n<!--\r\nLink to relevant issues or previous PRs, one per line. Use \"fixes\" to automatically close an issue.\r\n-->\r\n\r\n- fixes #1661\r\n\r\n<!--\r\nEnsure each step in CONTRIBUTING.rst is complete by adding an \"x\" to each box below.\r\n\r\nIf only docs were changed, these",
+    "fixed_files": [
+      "src/jinja2/loaders.py",
+      "tests/test_loader.py"
+    ],
+    "fix_commit": "58a358f0928df381c003be244b930367c68dbb85",
+    "base_commit": "b4b28ec01c60b8753ab53fe60b10d7dbaa55842b"
+  },
+  {
+    "repo": "pallets/jinja",
+    "repo_url": "https://github.com/pallets/jinja.git",
+    "issue_number": 1706,
+    "title": "Improve the PackageLoader error message",
+    "body": "Explain why the `PackageLoader` failed when the `package_path` directory is missing.\r\n\r\n- fixes #1705\r\n\r\n<!--\r\nEnsure each step in CONTRIBUTING.rst is complete by adding an \"x\" to each box below.\r\n\r\nIf only docs were changed, these aren't relevant and can be removed.\r\n-->\r\n\r\nChecklist:\r\n\r\n- [ ] Add tests that demonstrate the correct behavior of the change. Tests should fail without the change.\r\n- [ ] Add or update relevant docs, in the docs folder and in code.\r\n- [ ] Add an entry in `CHANGES.rst",
+    "fixed_files": [
+      "src/jinja2/loaders.py",
+      "tests/test_loader.py"
+    ],
+    "fix_commit": "53c75915c929eeb8582e70fdee9fc262f5c4ae58",
+    "base_commit": "58a358f0928df381c003be244b930367c68dbb85"
+  },
+  {
+    "repo": "pallets/jinja",
+    "repo_url": "https://github.com/pallets/jinja.git",
+    "issue_number": 2061,
+    "title": "fix default for `Environment.overlay(enable_async)`",
+    "body": "Got a wrong behaviour with `Environment.overlay` and seems to me an obvious error code.",
+    "fixed_files": [
+      "src/jinja2/environment.py",
+      "tests/test_api.py"
+    ],
+    "fix_commit": "b4b28ec01c60b8753ab53fe60b10d7dbaa55842b",
+    "base_commit": "767b23617628419ae3709ccfb02f9602ae9fe51f"
+  },
+  {
+    "repo": "pallets/werkzeug",
+    "repo_url": "https://github.com/pallets/werkzeug.git",
+    "issue_number": 3129,
+    "title": "fix trailing whitespace in WWW-Authenticate bearer",
+    "body": "As per [rfc9110#challenge.and.response] the WWW-Authenticate header may omits the realm and other parameters, i.e. the header can contain a single word: the auth-scheme.\r\n\r\nFor those parameters-less WWW-Authenticate headers, werkzeug would leave a trailing white space: \"Bearer \" instead of \"Bearer\". Some libraries, namely h11, rightfully reject those headers as malformed.\r\n\r\n[rfc9110#challenge.and.response]: https://httpwg.org/specs/rfc9110.html#challenge.and.response\r\n\r\nfixes #3127\r\n\r\n<!--\r\nBef",
+    "fixed_files": [
+      "src/werkzeug/datastructures/auth.py",
+      "tests/test_http.py"
+    ],
+    "fix_commit": "dafe7f1e37cf78cc7f11a9706c62a23e0dba9010",
+    "base_commit": "795f4eaf6ef1fdc2fd1d7114c61ad384ede4322c"
+  },
+  {
+    "repo": "pallets/werkzeug",
+    "repo_url": "https://github.com/pallets/werkzeug.git",
+    "issue_number": 3038,
+    "title": "Add a DuplicateRuleError",
+    "body": "This is raised if an equivalent rule is added to the matcher to an\r\nexisting rule. This should help users of the router know when they've\r\naccidentally duplicated a match.",
+    "fixed_files": [
+      "src/werkzeug/routing/exceptions.py",
+      "src/werkzeug/routing/matcher.py",
+      "src/werkzeug/routing/rules.py",
+      "tests/test_routing.py"
+    ],
+    "fix_commit": "bf7529e62685e0b87350481703ddae5b6351072d",
+    "base_commit": "b43ad6ec8679d20a778e93b1a9e852c1e2937f2a"
+  },
+  {
+    "repo": "pallets/werkzeug",
+    "repo_url": "https://github.com/pallets/werkzeug.git",
+    "issue_number": 3080,
+    "title": "fix typos",
+    "body": "Hi Pallets team! Hope you're having a great day.\n\nI was recently exploring the Werkzeug codebase and spotted a couple of small typos in the docstrings that I thought would be worth tidying up to keep the documentation polished.\n\n**Changes:**\n\n1.  **`src/werkzeug/datastructures/csp.py`**: Fixed a typo where `ContentSecuirtyPolicy` was written instead of `ContentSecurityPolicy`. Correcting this ensures that Sphinx can properly resolve the `:class:` cross-reference in the generated documentation.\n2",
+    "fixed_files": [
+      "src/werkzeug/datastructures/csp.py",
+      "src/werkzeug/sansio/response.py"
+    ],
+    "fix_commit": "a9743ea00da9a582b961274cadd4de189c2fd249",
+    "base_commit": "d9cda879dd5cd13202fd7299b1eb407a6f92e0ff"
+  },
+  {
+    "repo": "pallets/werkzeug",
+    "repo_url": "https://github.com/pallets/werkzeug.git",
+    "issue_number": 3078,
+    "title": "initialize `_pin` in debugger",
+    "body": "Fix AttributeError when pin_security=False (#3075)\r\n\r\nStarting with werkzeug 3.1.4, initializing `DebuggedApplication` with\r\n`pin_security=False` raises an `AttributeError` because the `pin` setter\r\nattempts to delete `self._pin` before it has been initialized.\r\n\r\nThe issue occurs in `__init__` when `pin_security=False`: it calls\r\n`self.pin = None`, which triggers the setter that tries to execute\r\n`del self._pin`. Since `_pin` hasn't been created yet (it's lazily\r\ninitialized by the getter), thi",
+    "fixed_files": [
+      "src/werkzeug/debug/__init__.py",
+      "tests/test_debug.py"
+    ],
+    "fix_commit": "b48878cf16dfca3c89ac58aca47ab1ecfcb71354",
+    "base_commit": "f637275bfa68ebd80bec1da9173211ce2dc4fa33"
+  }
+]
