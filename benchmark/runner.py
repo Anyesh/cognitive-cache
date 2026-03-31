@@ -113,21 +113,21 @@ def run_benchmark(
     all_results = []
 
     for issue in issues:
-        print(f"\n{'='*60}")
-        print(f"Issue: {issue.repo}#{issue.issue_number} — {issue.title}")
-        print(f"{'='*60}")
+        print(f"\n{'='*60}", flush=True)
+        print(f"Issue: {issue.repo}#{issue.issue_number} - {issue.title}".encode("ascii", "replace").decode(), flush=True)
+        print(f"{'='*60}", flush=True)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_dir = os.path.join(tmpdir, "repo")
             try:
                 _clone_at_commit(issue.repo_url, issue.base_commit, repo_dir)
             except subprocess.CalledProcessError as e:
-                print(f"  SKIP: Failed to clone {issue.repo_url}: {e}")
+                print(f"  SKIP: Failed to clone {issue.repo_url}: {e}", flush=True)
                 continue
 
             sources = index_repo(repo_dir)
             if not sources:
-                print(f"  SKIP: No source files found")
+                print(f"  SKIP: No source files found", flush=True)
                 continue
 
             git_analyzer = GitAnalyzer(repo_dir)
@@ -175,12 +175,12 @@ def run_benchmark(
                 prompt = build_prompt(issue.title, issue.body, context_files)
 
                 for model_name, adapter in llm_adapters.items():
-                    print(f"  [{strategy_name}] [{model_name}] recall={file_recall:.2f} tokens={result.total_tokens}")
+                    print(f"  [{strategy_name}] [{model_name}] recall={file_recall:.2f} tokens={result.total_tokens}", flush=True)
 
                     try:
                         patch = adapter.complete(prompt, max_tokens=4096, temperature=0.0)
                     except Exception as e:
-                        print(f"    ERROR: {e}")
+                        print(f"    ERROR: {e}", flush=True)
                         patch = f"ERROR: {e}"
 
                     all_results.append(RunResult(
@@ -201,7 +201,7 @@ def run_benchmark(
                 try:
                     result = triage.select(sources, task, budget)
                 except Exception as e:
-                    print(f"  [llm_triage] [{model_name}] ERROR: {e}")
+                    print(f"  [llm_triage] [{model_name}] ERROR: {e}", flush=True)
                     continue
 
                 selected_paths = {ss.source.path for ss in result.selected}
@@ -209,7 +209,7 @@ def run_benchmark(
                 context_files = {ss.source.path: ss.source.content for ss in result.selected}
                 prompt = build_prompt(issue.title, issue.body, context_files)
 
-                print(f"  [llm_triage] [{model_name}] recall={file_recall:.2f} tokens={result.total_tokens}")
+                print(f"  [llm_triage] [{model_name}] recall={file_recall:.2f} tokens={result.total_tokens}", flush=True)
 
                 try:
                     patch = adapter.complete(prompt, max_tokens=4096, temperature=0.0)
@@ -231,6 +231,6 @@ def run_benchmark(
     results_path = os.path.join(output_dir, f"results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
     with open(results_path, "w") as f:
         json.dump([asdict(r) for r in all_results], f, indent=2)
-    print(f"\nResults saved to {results_path}")
+    print(f"\nResults saved to {results_path}", flush=True)
 
     return all_results
