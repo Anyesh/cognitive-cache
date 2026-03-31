@@ -18,7 +18,7 @@ def main():
 
     # Set up local model adapters
     adapters = {
-        "qwen3.5-9b": LlamaCppAdapter(model="Qwen3.5-9B-Q4_K_M"),
+        "qwen3.5-9b": LlamaCppAdapter(),
     }
 
     # Run benchmark with 12K token budget
@@ -30,7 +30,9 @@ def main():
     )
 
     print(f"\nTotal runs: {len(results)}")
-    print("Analyze with: uv run python -m benchmark.analyze benchmark/results/<file>.json")
+    print(
+        "Analyze with: uv run python -m benchmark.analyze benchmark/results/<file>.json"
+    )
 
 
 if __name__ == "__main__":

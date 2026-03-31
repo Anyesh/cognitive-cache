@@ -5,31 +5,43 @@ Zero cost, unlimited runs — perfect for benchmark iteration.
 """
 
 import json
+import os
 import urllib.request
 
 from cognitive_cache.llm.adapter import LLMAdapter, LLMResponse
+
+LLAMACPP_DEFAULT_URL = "http://localhost:8080"
+LLAMACPP_DEFAULT_MODEL = "Qwen3.5-9B-Q4_K_M"
 
 
 class LlamaCppAdapter(LLMAdapter):
     """Adapter for local llama.cpp server with OpenAI-compatible API."""
 
-    def __init__(self, base_url: str = "http://localhost:8081", model: str = "Qwen3.5-9B-Q4_K_M"):
-        self._base_url = base_url.rstrip("/")
-        self._model = model
+    def __init__(self, base_url: str | None = None, model: str | None = None):
+        self._base_url = (
+            base_url or os.environ.get("LLAMACPP_BASE_URL") or LLAMACPP_DEFAULT_URL
+        ).rstrip("/")
+        self._model = (
+            model or os.environ.get("LLAMACPP_MODEL") or LLAMACPP_DEFAULT_MODEL
+        )
 
-    def complete(self, prompt: str, max_tokens: int = 4096, temperature: float = 0.0) -> str:
+    def complete(
+        self, prompt: str, max_tokens: int = 4096, temperature: float = 0.0
+    ) -> str:
         resp = self.complete_with_metadata(prompt, max_tokens, temperature)
         return resp.content
 
     def complete_with_metadata(
         self, prompt: str, max_tokens: int = 4096, temperature: float = 0.0
     ) -> LLMResponse:
-        payload = json.dumps({
-            "model": self._model,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "messages": [{"role": "user", "content": prompt}],
-        }).encode()
+        payload = json.dumps(
+            {
+                "model": self._model,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+                "messages": [{"role": "user", "content": prompt}],
+            }
+        ).encode()
 
         req = urllib.request.Request(
             f"{self._base_url}/v1/chat/completions",
