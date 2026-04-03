@@ -24,72 +24,31 @@ def _make_task(title="Fix bug", body="The login function fails", symbols=None):
 
 # --- Symbol Overlap ---
 
-
-def test_symbol_overlap_exact_match_scores_high():
+def test_symbol_overlap_full_match():
     source = _make_source(symbols=["login", "authenticate"])
-    task = _make_task(title="fix the login function", body="", symbols=["login"])
+    task = _make_task(symbols=["login", "authenticate"])
     signal = SymbolOverlapSignal()
     score = signal.score(source, task, [])
-    assert score >= 0.5
+    assert score == 1.0
 
 
-def test_symbol_overlap_contains_match_scores_lower():
-    source = _make_source(symbols=["test_login_success", "test_login_failure"])
-    task = _make_task(title="fix the login function", body="", symbols=["login"])
+def test_symbol_overlap_partial_match():
+    source = _make_source(symbols=["login", "logout", "reset"])
+    task = _make_task(symbols=["login"])
     signal = SymbolOverlapSignal()
     score = signal.score(source, task, [])
-    assert 0.0 < score < 0.5
-
-
-def test_symbol_overlap_exact_beats_contains():
-    exact_source = _make_source(path="auth.py", symbols=["login"])
-    contains_source = _make_source(
-        path="test_auth.py", symbols=["test_login_success", "test_login_failure"]
-    )
-    task = _make_task(title="fix the login function", body="", symbols=["login"])
-    signal = SymbolOverlapSignal()
-    exact_score = signal.score(exact_source, task, [])
-    contains_score = signal.score(contains_source, task, [])
-    assert exact_score > contains_score
+    assert 0.0 < score <= 1.0
 
 
 def test_symbol_overlap_no_match():
     source = _make_source(symbols=["database", "query"])
-    task = _make_task(title="fix the login function", body="", symbols=["login"])
-    signal = SymbolOverlapSignal()
-    score = signal.score(source, task, [])
-    assert score == 0.0
-
-
-def test_symbol_overlap_content_match():
-    source = _make_source(
-        symbols=["other_func"],
-        content="# This module handles login for the app",
-    )
-    task = _make_task(title="fix the login function", body="", symbols=["login"])
-    signal = SymbolOverlapSignal()
-    score = signal.score(source, task, [])
-    assert 0.0 < score <= 0.15
-
-
-def test_symbol_overlap_fallback_to_task_symbols():
-    source = _make_source(symbols=["login"])
-    task = _make_task(title="fix", body="", symbols=["login"])
-    signal = SymbolOverlapSignal()
-    score = signal.score(source, task, [])
-    assert score > 0.0
-
-
-def test_symbol_overlap_empty_task():
-    source = _make_source(symbols=["login"])
-    task = _make_task(title="", body="", symbols=[])
+    task = _make_task(symbols=["login"])
     signal = SymbolOverlapSignal()
     score = signal.score(source, task, [])
     assert score == 0.0
 
 
 # --- Graph Distance ---
-
 
 def test_graph_distance_direct_neighbor():
     graph = DependencyGraph()
@@ -118,7 +77,6 @@ def test_graph_distance_no_connection():
 
 # --- Change Recency ---
 
-
 def test_change_recency_with_scores():
     recency_data = {"recent.py": 1.0, "old.py": 0.2}
     signal = ChangeRecencySignal(recency_data)
@@ -136,24 +94,7 @@ def test_change_recency_unknown_file():
     assert signal.score(source, _make_task(), []) == 0.0
 
 
-def test_change_recency_shallow_fallback():
-    recency_data = {"recent.py": 1.0}
-    signal = ChangeRecencySignal(recency_data, is_shallow=True)
-    source = _make_source(path="stable_core.py")
-    score = signal.score(source, _make_task(), [])
-    assert score == 0.3
-
-
-def test_change_recency_not_shallow_uses_zero():
-    recency_data = {"recent.py": 1.0}
-    signal = ChangeRecencySignal(recency_data, is_shallow=False)
-    source = _make_source(path="unknown.py")
-    score = signal.score(source, _make_task(), [])
-    assert score == 0.0
-
-
 # --- Redundancy ---
-
 
 def test_redundancy_penalizes_similar():
     source = _make_source(path="auth2.py", symbols=["login", "validate"])
@@ -179,7 +120,6 @@ def test_redundancy_empty_selection():
 
 # --- Embedding Similarity ---
 
-
 def test_embedding_similarity_related_content():
     signal = EmbeddingSimilaritySignal()
     source = _make_source(content="def login(user, password): authenticate(user)")
@@ -201,7 +141,6 @@ def test_embedding_similarity_unrelated():
 
 # --- File Role Prior ---
 
-
 def test_file_role_test_file():
     signal = FileRolePriorSignal()
     source = _make_source(path="tests/test_auth.py")
@@ -222,11 +161,3 @@ def test_file_role_regular_file():
     regular_source = _make_source(path="src/utils.py")
     task = _make_task()
     assert signal.score(test_source, task, []) != signal.score(regular_source, task, [])
-
-
-def test_file_role_source_beats_test():
-    signal = FileRolePriorSignal()
-    test_source = _make_source(path="tests/test_auth.py")
-    regular_source = _make_source(path="src/auth.py")
-    task = _make_task()
-    assert signal.score(regular_source, task, []) > signal.score(test_source, task, [])

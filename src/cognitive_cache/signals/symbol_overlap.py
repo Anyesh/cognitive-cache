@@ -1,109 +1,32 @@
-"""Signal 1: Symbol Overlap (core-word tier scoring).
+"""Signal 1: Symbol Overlap.
 
-Scores a file by how well it covers the core concepts in the task.
+Scores a file by how many of the task's mentioned symbols appear in the file.
+Two-level matching:
+  1. Defined symbols: task symbols that match function/class names in the file
+  2. Content keywords: task symbols that appear anywhere in the file content
 
-Extracts "core words" from the task text and scores each word by
-the quality of its best match in the file's defined symbols:
-  - Exact match (symbol == word): 1.0
-  - Contains match (word in symbol): 0.4
-  - Content match (word in file text): 0.15
-  - No match: 0.0
-
-This prevents test files (which define many compound symbols like
-test_login_success) from outscoring source files that define the
-actual symbol (login) the task is about.
+Content matching is weighted lower (0.5x) since it's noisier.
 """
-
-import re
 
 from cognitive_cache.models import Source, Task
 from cognitive_cache.signals.base import Signal
 
-_STOP_WORDS = {
-    "should",
-    "would",
-    "could",
-    "their",
-    "there",
-    "these",
-    "those",
-    "where",
-    "while",
-    "being",
-    "about",
-    "which",
-    "doesn",
-    "after",
-    "before",
-    "called",
-    "every",
-    "first",
-    "other",
-    "still",
-    "since",
-    "using",
-    "when",
-    "then",
-    "than",
-    "that",
-    "this",
-    "with",
-    "from",
-    "into",
-    "have",
-    "been",
-    "were",
-    "also",
-    "some",
-    "each",
-    "what",
-    "will",
-    "more",
-    "very",
-    "just",
-    "like",
-    "only",
-    "most",
-    "such",
-}
-
-_TIER_EXACT = 1.0
-_TIER_CONTAINS = 0.4
-_TIER_CONTENT = 0.15
-
-
-def _extract_core_words(text: str) -> list[str]:
-    words = set(re.findall(r"\b[a-z_][a-z0-9_]{3,}\b", text.lower()))
-    return sorted(words - _STOP_WORDS)
-
 
 class SymbolOverlapSignal(Signal):
-    def score(
-        self, source: Source, task: Task, selected: list[Source], **kwargs
-    ) -> float:
-        core_words = _extract_core_words(task.full_text)
-
-        if len(core_words) < 2 and task.symbols:
-            extra = {s.lower() for s in task.symbols if len(s) >= 4}
-            core_words = sorted(set(core_words) | extra)
-
-        if not core_words:
+    def score(self, source: Source, task: Task, selected: list[Source], **kwargs) -> float:
+        if not task.symbols:
             return 0.0
 
-        symbols_lower = {s.lower() for s in source.symbols}
+        # Level 1: exact symbol match (function/class names)
+        symbol_hits = len(source.symbols & task.symbols)
+
+        # Level 2: content keyword match (symbol appears anywhere in file)
         content_lower = source.content.lower()
+        content_hits = 0
+        for sym in task.symbols:
+            if sym not in source.symbols and sym.lower() in content_lower:
+                content_hits += 1
 
-        total = 0.0
-        for word in core_words:
-            best = 0.0
-            for sym in symbols_lower:
-                if sym == word:
-                    best = _TIER_EXACT
-                    break
-                if word in sym and best < _TIER_CONTAINS:
-                    best = _TIER_CONTAINS
-            if best == 0.0 and word in content_lower:
-                best = _TIER_CONTENT
-            total += best
-
-        return min(1.0, total / len(core_words))
+        # Combine: symbol hits count full, content hits count half
+        effective_hits = symbol_hits + (content_hits * 0.5)
+        return min(1.0, effective_hits / len(task.symbols))

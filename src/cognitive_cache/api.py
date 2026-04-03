@@ -136,7 +136,6 @@ class RepoIndex:
     embedding_signal: EmbeddingSimilaritySignal
     file_mtimes: dict[str, float]
     head_commit: str
-    is_shallow: bool = False
 
     @classmethod
     def build(cls, repo_path: str) -> "RepoIndex":
@@ -152,7 +151,6 @@ class RepoIndex:
 
         git_analyzer = GitAnalyzer(repo_path)
         recency_data = git_analyzer.recency_scores()
-        is_shallow = git_analyzer.is_shallow()
 
         embedding_signal = EmbeddingSimilaritySignal()
         if sources:
@@ -166,7 +164,6 @@ class RepoIndex:
             embedding_signal=embedding_signal,
             file_mtimes=_collect_mtimes(repo_path, sources),
             head_commit=_get_head_commit(repo_path),
-            is_shallow=is_shallow,
         )
 
     def refresh(self) -> "RepoIndex":
@@ -207,11 +204,9 @@ class RepoIndex:
             embedding_signal.fit(sources)
 
         recency_data = self.recency_data
-        is_shallow = self.is_shallow
         if head_changed:
             git_analyzer = GitAnalyzer(self.repo_path)
             recency_data = git_analyzer.recency_scores()
-            is_shallow = git_analyzer.is_shallow()
 
         return RepoIndex(
             repo_path=self.repo_path,
@@ -221,7 +216,6 @@ class RepoIndex:
             embedding_signal=embedding_signal,
             file_mtimes=_collect_mtimes(self.repo_path, sources),
             head_commit=current_head,
-            is_shallow=is_shallow,
         )
 
 
@@ -249,7 +243,6 @@ def select_context(
         recency_data=index.recency_data,
         embedding_signal=index.embedding_signal,
         entry_points=entry_points,
-        is_shallow=index.is_shallow,
     )
     selector = GreedySelector(value_function=vf)
     result = selector.select(index.sources, task, budget)
