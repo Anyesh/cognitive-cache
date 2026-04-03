@@ -1,0 +1,67 @@
+name: Suggest relevant files for new issues
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  suggest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history for git recency signal
+
+      - uses: astral-sh/setup-uv@v4
+
+      - name: Install cognitive-cache
+        run: uv sync
+
+      - name: Select context for this issue
+        id: select
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          uv run cognitive-cache select \
+            --repo . \
+            --task "${ISSUE_TITLE}. ${ISSUE_BODY}" \
+            --budget 12000 \
+            --json > /tmp/cc-result.json
+
+      - name: Comment on issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const result = JSON.parse(fs.readFileSync('/tmp/cc-result.json', 'utf8'));
+
+            const rows = result.files.map(f =>
+              `| \`${f.path.replace(/[|`]/g, '')}\` | ${f.score.toFixed(3)} | ${f.token_count} |`
+            ).join('\n');
+
+            const total = `${result.files.length} files, ${result.total_tokens.toLocaleString()} tokens`;
+
+            const body = [
+              '## Suggested files',
+              '',
+              'Based on the issue description, these files are most likely relevant:',
+              '',
+              '| File | Score | Tokens |',
+              '|------|-------|--------|',
+              rows,
+              '',
+              `**${total}** selected within a 12K token budget.`,
+              '',
+              `*Found by [cognitive-cache](https://github.com/${context.repo.owner}/${context.repo.repo}) using symbol analysis, dependency graphs, git history, and redundancy-aware optimization. Zero LLM calls.*`,
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });

@@ -4,6 +4,10 @@ Every LLM tool right now (Cursor, Claude Code, Copilot, all of them) decides wha
 
 This project is an attempt to build one.
 
+**No LLM calls. No API keys. No cloud. Runs entirely local.**
+
+![cognitive-cache finding the right files for a real GitHub issue](demo/demo.gif)
+
 ## the problem: context as an os-level resource
 
 Think of it this way:
@@ -111,11 +115,66 @@ Six signals score each file:
 
 These get combined into a weighted score, and a greedy selector picks files one at a time, re-evaluating redundancy after each pick. If a file is too large to fit (like a 13K token app.py when your budget is 12K), it gets chunked to extract just the relevant functions.
 
-## running it
+## using it
+
+### as a library
+
+```python
+from cognitive_cache import select_context_from_repo
+
+result = select_context_from_repo(".", "fix the login redirect bug")
+for item in result.selected:
+    print(f"{item.source.path} (score: {item.score:.3f})")
+```
+
+For repeated queries against the same repo, build the index once and reuse it:
+
+```python
+from cognitive_cache import RepoIndex, select_context
+
+index = RepoIndex.build(".")
+r1 = select_context(index, "fix the login bug")
+r2 = select_context(index, "add rate limiting to the API")
+```
+
+### as a CLI
+
+```
+uv sync
+uv run cognitive-cache select --repo . --task "fix the login redirect bug"
+uv run cognitive-cache select --repo . --task "fix login" --json          # machine-readable
+uv run cognitive-cache select --repo . --task "fix login" --output ctx.txt # dump context to file
+```
+
+### as an MCP server (for Claude Code, Cursor, etc.)
+
+```
+uv sync --extra mcp
+uv run cognitive-cache-mcp  # starts stdio server
+```
+
+Add to your Claude Code MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "cognitive-cache": {
+      "command": "uv",
+      "args": ["run", "--project", "/path/to/cognitive-cache", "--extra", "mcp", "cognitive-cache-mcp"]
+    }
+  }
+}
+```
+
+### as a GitHub Action
+
+The included workflow (`.github/workflows/context-suggest.yml`) automatically comments on new issues with the most relevant files. It runs entirely in CI with no API keys required.
+
+## running the benchmark
 
 ```
 uv sync --dev
-uv run pytest tests/  # 56 tests
+uv run pytest tests/  # 97 tests
 ```
 
 To run the benchmark with a local llama.cpp server:
@@ -142,6 +201,9 @@ GITHUB_TOKEN=ghp_xxx uv run python benchmark/curate_dataset.py
 
 ```
 src/cognitive_cache/
+    api.py              # public API: RepoIndex, select_context
+    cli.py              # CLI entry point
+    mcp_server.py       # MCP server for Claude Code / Cursor
     models.py           # core types (Source, Task, ScoredSource, SelectionResult)
     indexer/             # turns a repo directory into a list of Source objects
     signals/             # the six scoring signals
@@ -156,12 +218,10 @@ benchmark/
 
 ## whats next
 
-The algorithm works but there's a lot of room to improve:
-
 - Weight tuning on a larger dataset, since the signal weights are currently hand-tuned
+- Improving the test-vs-source ranking for bug-fix tasks (the algorithm sometimes ranks test files above the source files that need fixing)
 - Adaptive replanning that re-optimizes context mid-conversation after the model calls a tool or asks a followup
 - Task-aware compression that goes beyond chunking to actually compress file content while preserving what's relevant
-- Packaging this as a library other tools can integrate
 
 ## why this matters
 
