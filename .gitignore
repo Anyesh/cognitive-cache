@@ -12,3 +12,4 @@ wheels/
 # Design docs
 docs/
 specs/
+.mcp.json
