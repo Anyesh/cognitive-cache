@@ -64,7 +64,7 @@ def main():
 
     mcp = _FastMCP(
         "cognitive-cache",
-        description="Optimal context selection for LLMs. Given a codebase and a task, "
+        instructions="Optimal context selection for LLMs. Given a codebase and a task, "
         "picks the files most likely to help the model get the answer right.",
     )
 
