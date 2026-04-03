@@ -4,7 +4,7 @@ Every LLM tool right now (Cursor, Claude Code, Copilot, all of them) decides wha
 
 This project is an attempt to build one.
 
-**No LLM calls. No API keys. No cloud. Runs entirely local.**
+**No any LLM calls or API keys or cloud. It runs entirely local.**
 
 ![cognitive-cache finding the right files for a real GitHub issue](demo/demo.gif)
 
