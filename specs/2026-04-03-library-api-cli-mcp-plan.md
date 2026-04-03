@@ -415,9 +415,12 @@ def test_repo_index_refresh_detects_file_change():
         _create_fake_repo(tmpdir)
         index = RepoIndex.build(tmpdir)
 
-        # Modify a file
-        with open(os.path.join(tmpdir, "src/auth.py"), "a") as f:
+        # Modify a file and explicitly bump mtime to avoid filesystem
+        # resolution issues (some FSes have 1-second granularity)
+        auth_path = os.path.join(tmpdir, "src/auth.py")
+        with open(auth_path, "a") as f:
             f.write("\ndef logout():\n    pass\n")
+        os.utime(auth_path, (os.path.getmtime(auth_path) + 2, os.path.getmtime(auth_path) + 2))
 
         refreshed = index.refresh()
         assert refreshed is not index  # new object
@@ -611,30 +614,6 @@ def _collect_mtimes(repo_path: str, sources: list[Source]) -> dict[str, float]:
         except OSError:
             pass
     return mtimes
-
-
-def _detect_language(path: str) -> str:
-    ext = os.path.splitext(path)[1]
-    return {
-        ".py": "python",
-        ".js": "javascript",
-        ".ts": "typescript",
-        ".jsx": "javascript",
-        ".tsx": "typescript",
-    }.get(ext, "unknown")
-
-
-def _extract_symbols(content: str, language: str) -> frozenset[str]:
-    """Extract identifier names from source code (same logic as repo_indexer)."""
-    symbols = set()
-    if language == "python":
-        symbols.update(re.findall(r"(?:def|class)\s+(\w+)", content))
-        symbols.update(re.findall(r"^(\w+)\s*=", content, re.MULTILINE))
-    elif language in ("javascript", "typescript"):
-        symbols.update(re.findall(r"(?:function|class)\s+(\w+)", content))
-        symbols.update(re.findall(r"(?:const|let|var)\s+(\w+)", content))
-        symbols.update(re.findall(r"export\s+(?:default\s+)?(?:function|class)\s+(\w+)", content))
-    return frozenset(symbols)
 
 
 def _extract_task_symbols(title: str, body: str, sources: list[Source]) -> frozenset[str]:
@@ -1147,7 +1126,6 @@ def main():
         sys.exit(0)
 
     # Warn if no symbols matched (vague task description)
-    task_symbols = result.selected[0].signal_scores.get("symbol_overlap", 0.0) if result.selected else 0.0
     if all(ss.signal_scores.get("symbol_overlap", 0.0) == 0.0 for ss in result.selected):
         print("Warning: No symbol matches found, results may be less precise.",
               file=sys.stderr)
