@@ -12,6 +12,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+mcp = [
+    "mcp>=1.0.0",
+]
 benchmark = [
     "anthropic>=0.40.0",
     "openai>=1.50.0",
@@ -22,6 +25,10 @@ dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.1.0",
 ]
+
+[project.scripts]
+cognitive-cache = "cognitive_cache.cli:main"
+cognitive-cache-mcp = "cognitive_cache.mcp_server:main"
 
 [build-system]
 requires = ["uv_build>=0.9.17,<0.10.0"]

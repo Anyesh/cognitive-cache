@@ -5,15 +5,23 @@ from cognitive_cache.core.orderer import order_context
 
 
 def _make_source(path, content="x = 1", tokens=10, symbols=None):
-    return Source(path=path, content=content, token_count=tokens,
-                  language="python", symbols=frozenset(symbols or []))
+    return Source(
+        path=path,
+        content=content,
+        token_count=tokens,
+        language="python",
+        symbols=frozenset(symbols or []),
+    )
 
 
 def _make_task(symbols=None):
-    return Task(title="Fix bug", body="login fails", symbols=frozenset(symbols or ["login"]))
+    return Task(
+        title="Fix bug", body="login fails", symbols=frozenset(symbols or ["login"])
+    )
 
 
 # --- Value Function ---
+
 
 def test_value_function_scores_relevant_higher():
     relevant = _make_source("auth.py", symbols=["login", "authenticate"])
@@ -52,6 +60,7 @@ def test_value_function_returns_signal_breakdown():
 
 
 # --- Selector ---
+
 
 def test_selector_respects_budget():
     sources = [
@@ -99,14 +108,17 @@ def test_selector_stops_at_threshold():
     ]
     task = _make_task(symbols=["login"])
 
-    selector = GreedySelector(value_function=ValueFunction(), score_threshold=0.3, vpt_threshold=0.01)
+    selector = GreedySelector(
+        value_function=ValueFunction(), score_threshold=0.20, vpt_threshold=0.02
+    )
     result = selector.select(sources, task, budget=1000)
 
-    # b.py and c.py have no symbol overlap — below both thresholds
+    # b.py and c.py have no symbol overlap, so they score below both thresholds
     assert len(result.selected) < len(sources)
 
 
 # --- Orderer ---
+
 
 def test_orderer_puts_highest_score_first():
     scored = [

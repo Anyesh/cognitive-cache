@@ -1,7 +1,10 @@
 import os
 import tempfile
 
-from cognitive_cache.indexer.graph_builder import build_dependency_graph
+from cognitive_cache.indexer.graph_builder import (
+    DependencyGraph,
+    build_dependency_graph,
+)
 from cognitive_cache.indexer.repo_indexer import index_repo
 
 
@@ -25,7 +28,9 @@ def test_js_imports_detected():
     with tempfile.TemporaryDirectory() as tmpdir:
         os.makedirs(os.path.join(tmpdir, "src"))
         with open(os.path.join(tmpdir, "src", "app.js"), "w") as f:
-            f.write("const utils = require('./utils');\nimport config from './config';\n")
+            f.write(
+                "const utils = require('./utils');\nimport config from './config';\n"
+            )
         with open(os.path.join(tmpdir, "src", "utils.js"), "w") as f:
             f.write("module.exports = {}\n")
         with open(os.path.join(tmpdir, "src", "config.js"), "w") as f:
@@ -55,3 +60,56 @@ def test_graph_distance():
         assert graph.shortest_distance("a.py", "b.py") == 1
         assert graph.shortest_distance("a.py", "c.py") == 2
         assert graph.shortest_distance("a.py", "unrelated.py") == float("inf")
+
+
+def test_shortest_distance_caches_undirected_graph():
+    graph = DependencyGraph()
+    graph.add_file("a.py")
+    graph.add_file("b.py")
+    graph.add_file("c.py")
+    graph.add_edge("a.py", "b.py")
+    graph.add_edge("b.py", "c.py")
+
+    # First call computes and caches
+    d1 = graph.shortest_distance("a.py", "c.py")
+    assert d1 == 2
+
+    # Second call should return same result (from cache)
+    d2 = graph.shortest_distance("a.py", "c.py")
+    assert d2 == 2
+
+    # Verify cache exists
+    assert graph._undirected is not None
+
+
+def test_undirected_cache_invalidated_on_add_edge():
+    graph = DependencyGraph()
+    graph.add_file("a.py")
+    graph.add_file("b.py")
+    graph.add_file("c.py")
+    graph.add_edge("a.py", "b.py")
+
+    # Populate cache
+    graph.shortest_distance("a.py", "b.py")
+    assert graph._undirected is not None
+
+    # Adding edge invalidates cache
+    graph.add_edge("b.py", "c.py")
+    assert graph._undirected is None
+
+    # New distance computation works with updated graph
+    d = graph.shortest_distance("a.py", "c.py")
+    assert d == 2
+
+
+def test_undirected_cache_invalidated_on_add_file():
+    graph = DependencyGraph()
+    graph.add_file("a.py")
+
+    # Populate cache
+    graph.shortest_distance("a.py", "a.py")
+    assert graph._undirected is not None
+
+    # Adding file invalidates cache
+    graph.add_file("b.py")
+    assert graph._undirected is None

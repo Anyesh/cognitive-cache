@@ -20,14 +20,15 @@ class DependencyGraph:
 
     def __init__(self):
         self._graph = nx.DiGraph()
+        self._undirected = None
 
     def add_file(self, path: str):
-        """Add a file node to the graph."""
         self._graph.add_node(path)
+        self._undirected = None
 
     def add_edge(self, importer: str, imported: str):
-        """Add a directed edge: importer depends on imported."""
         self._graph.add_edge(importer, imported)
+        self._undirected = None
 
     def has_edge(self, source: str, target: str) -> bool:
         return self._graph.has_edge(source, target)
@@ -39,9 +40,10 @@ class DependencyGraph:
         "A imports B" means both A and B are relevant to each other.
         Returns float('inf') if no path exists.
         """
-        undirected = self._graph.to_undirected()
+        if self._undirected is None:
+            self._undirected = self._graph.to_undirected()
         try:
-            return nx.shortest_path_length(undirected, source, target)
+            return nx.shortest_path_length(self._undirected, source, target)
         except (nx.NodeNotFound, nx.NetworkXNoPath):
             return float("inf")
 
@@ -50,7 +52,9 @@ class DependencyGraph:
         return set(self._graph.nodes)
 
 
-def _resolve_python_import(module_name: str, source_path: str, all_paths: set[str]) -> str | None:
+def _resolve_python_import(
+    module_name: str, source_path: str, all_paths: set[str]
+) -> str | None:
     """Resolve a Python module name to a file path.
 
     'from utils import x' -> 'utils.py'
@@ -74,7 +78,9 @@ def _resolve_python_import(module_name: str, source_path: str, all_paths: set[st
     return None
 
 
-def _resolve_js_import(import_path: str, source_path: str, all_paths: set[str]) -> str | None:
+def _resolve_js_import(
+    import_path: str, source_path: str, all_paths: set[str]
+) -> str | None:
     """Resolve a JS/TS import path to a file path.
 
     './utils' -> 'src/utils.js' (relative to importer)
@@ -84,7 +90,9 @@ def _resolve_js_import(import_path: str, source_path: str, all_paths: set[str]) 
 
     source_dir = os.path.dirname(source_path)
     # Normalize the relative path
-    resolved = os.path.normpath(os.path.join(source_dir, import_path)).replace("\\", "/")
+    resolved = os.path.normpath(os.path.join(source_dir, import_path)).replace(
+        "\\", "/"
+    )
 
     # Try with various extensions
     for ext in ("", ".js", ".ts", ".jsx", ".tsx", "/index.js", "/index.ts"):
@@ -120,7 +128,9 @@ def build_dependency_graph(sources: list[Source]) -> DependencyGraph:
 
         elif source.language in ("javascript", "typescript"):
             # Match: require('./path'), import X from './path', import('./path')
-            for match in re.finditer(r"""(?:require|from|import)\s*\(?\s*['"]([^'"]+)['"]""", source.content):
+            for match in re.finditer(
+                r"""(?:require|from|import)\s*\(?\s*['"]([^'"]+)['"]""", source.content
+            ):
                 import_path = match.group(1)
                 target = _resolve_js_import(import_path, source.path, all_paths)
                 if target and target != source.path:

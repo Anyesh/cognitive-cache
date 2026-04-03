@@ -24,6 +24,7 @@ from cognitive_cache.baselines.embedding_select import EmbeddingStrategy
 from cognitive_cache.baselines.grep_select import GrepStrategy
 from cognitive_cache.baselines.llm_triage import LLMTriageStrategy
 from cognitive_cache.llm.adapter import LLMAdapter
+from cognitive_cache.api import _extract_task_symbols, _find_entry_points
 
 from benchmark.dataset import BenchmarkIssue
 from benchmark.prompt_template import build_prompt
@@ -43,63 +44,18 @@ class RunResult:
     timestamp: str
 
 
-def _extract_task_symbols(title: str, body: str, sources) -> frozenset[str]:
-    """Extract symbols using exact and selective substring matching.
-
-    Strategy:
-    1. Exact match: symbol name appears verbatim in issue text (strongest)
-    2. Substring match: issue words (6+ chars) appear in symbol names
-       Short common words like 'error', 'class', 'test' cause too many false matches.
-    """
-    all_symbols = set()
-    for s in sources:
-        all_symbols.update(s.symbols)
-
-    text = f"{title} {body}".lower()
-    import re
-    # Only use longer words for substring matching to avoid noise
-    task_words_long = set(re.findall(r"\b[a-z_][a-z0-9_]{5,}\b", text))
-    # Common words that match everywhere — exclude them
-    stop_words = {
-        "return", "import", "should", "string", "number", "before", "after",
-        "called", "values", "object", "update", "create", "delete", "method",
-        "function", "default", "option", "options", "config", "module",
-        "result", "response", "request", "handler", "callback", "parameter",
-    }
-    task_words_long -= stop_words
-
-    matches = set()
-    for sym in all_symbols:
-        sym_lower = sym.lower()
-        # Exact match: full symbol name in issue text
-        if sym_lower in text and len(sym_lower) >= 4:
-            matches.add(sym)
-            continue
-        # Substring match: long task words in symbol name
-        for word in task_words_long:
-            if word in sym_lower:
-                matches.add(sym)
-                break
-
-    return frozenset(matches)
-
-
-def _find_entry_points(task_symbols: frozenset[str], sources) -> set[str]:
-    entry_points = set()
-    for s in sources:
-        if s.symbols & task_symbols:
-            entry_points.add(s.path)
-    return entry_points
-
-
 def _clone_at_commit(repo_url: str, commit: str, target_dir: str):
     subprocess.run(
         ["git", "clone", "--quiet", repo_url, target_dir],
-        capture_output=True, check=True, timeout=120,
+        capture_output=True,
+        check=True,
+        timeout=120,
     )
     subprocess.run(
         ["git", "checkout", "--quiet", commit],
-        cwd=target_dir, capture_output=True, check=True,
+        cwd=target_dir,
+        capture_output=True,
+        check=True,
     )
 
 
@@ -113,9 +69,14 @@ def run_benchmark(
     all_results = []
 
     for issue in issues:
-        print(f"\n{'='*60}", flush=True)
-        print(f"Issue: {issue.repo}#{issue.issue_number} - {issue.title}".encode("ascii", "replace").decode(), flush=True)
-        print(f"{'='*60}", flush=True)
+        print(f"\n{'=' * 60}", flush=True)
+        print(
+            f"Issue: {issue.repo}#{issue.issue_number} - {issue.title}".encode(
+                "ascii", "replace"
+            ).decode(),
+            flush=True,
+        )
+        print(f"{'=' * 60}", flush=True)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_dir = os.path.join(tmpdir, "repo")
@@ -175,25 +136,32 @@ def run_benchmark(
                 prompt = build_prompt(issue.title, issue.body, context_files)
 
                 for model_name, adapter in llm_adapters.items():
-                    print(f"  [{strategy_name}] [{model_name}] recall={file_recall:.2f} tokens={result.total_tokens}", flush=True)
+                    print(
+                        f"  [{strategy_name}] [{model_name}] recall={file_recall:.2f} tokens={result.total_tokens}",
+                        flush=True,
+                    )
 
                     try:
-                        patch = adapter.complete(prompt, max_tokens=4096, temperature=0.0)
+                        patch = adapter.complete(
+                            prompt, max_tokens=4096, temperature=0.0
+                        )
                     except Exception as e:
                         print(f"    ERROR: {e}", flush=True)
                         patch = f"ERROR: {e}"
 
-                    all_results.append(RunResult(
-                        issue_repo=issue.repo,
-                        issue_number=issue.issue_number,
-                        strategy=strategy_name,
-                        model=model_name,
-                        selected_files=list(selected_paths),
-                        file_recall=file_recall,
-                        tokens_used=result.total_tokens,
-                        generated_patch=patch,
-                        timestamp=datetime.now().isoformat(),
-                    ))
+                    all_results.append(
+                        RunResult(
+                            issue_repo=issue.repo,
+                            issue_number=issue.issue_number,
+                            strategy=strategy_name,
+                            model=model_name,
+                            selected_files=list(selected_paths),
+                            file_recall=file_recall,
+                            tokens_used=result.total_tokens,
+                            generated_patch=patch,
+                            timestamp=datetime.now().isoformat(),
+                        )
+                    )
 
             # LLM-triage baseline (needs LLM adapter)
             for model_name, adapter in llm_adapters.items():
@@ -206,29 +174,38 @@ def run_benchmark(
 
                 selected_paths = {ss.source.path for ss in result.selected}
                 file_recall = compute_file_recall(selected_paths, actual_files)
-                context_files = {ss.source.path: ss.source.content for ss in result.selected}
+                context_files = {
+                    ss.source.path: ss.source.content for ss in result.selected
+                }
                 prompt = build_prompt(issue.title, issue.body, context_files)
 
-                print(f"  [llm_triage] [{model_name}] recall={file_recall:.2f} tokens={result.total_tokens}", flush=True)
+                print(
+                    f"  [llm_triage] [{model_name}] recall={file_recall:.2f} tokens={result.total_tokens}",
+                    flush=True,
+                )
 
                 try:
                     patch = adapter.complete(prompt, max_tokens=4096, temperature=0.0)
                 except Exception as e:
                     patch = f"ERROR: {e}"
 
-                all_results.append(RunResult(
-                    issue_repo=issue.repo,
-                    issue_number=issue.issue_number,
-                    strategy="llm_triage",
-                    model=model_name,
-                    selected_files=list(selected_paths),
-                    file_recall=file_recall,
-                    tokens_used=result.total_tokens,
-                    generated_patch=patch,
-                    timestamp=datetime.now().isoformat(),
-                ))
+                all_results.append(
+                    RunResult(
+                        issue_repo=issue.repo,
+                        issue_number=issue.issue_number,
+                        strategy="llm_triage",
+                        model=model_name,
+                        selected_files=list(selected_paths),
+                        file_recall=file_recall,
+                        tokens_used=result.total_tokens,
+                        generated_patch=patch,
+                        timestamp=datetime.now().isoformat(),
+                    )
+                )
 
-    results_path = os.path.join(output_dir, f"results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+    results_path = os.path.join(
+        output_dir, f"results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    )
     with open(results_path, "w") as f:
         json.dump([asdict(r) for r in all_results], f, indent=2)
     print(f"\nResults saved to {results_path}", flush=True)

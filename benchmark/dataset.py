@@ -19,6 +19,7 @@ class BenchmarkIssue:
     fixed_files: list[str]
     fix_commit: str
     base_commit: str
+    ground_truth_diff: str = ""
 
 
 def save_dataset(issues: list[BenchmarkIssue], path: str):
@@ -30,4 +31,9 @@ def save_dataset(issues: list[BenchmarkIssue], path: str):
 def load_dataset(path: str) -> list[BenchmarkIssue]:
     with open(path) as f:
         data = json.load(f)
-    return [BenchmarkIssue(**item) for item in data]
+    issues = []
+    for item in data:
+        if "ground_truth_diff" not in item:
+            item["ground_truth_diff"] = ""
+        issues.append(BenchmarkIssue(**item))
+    return issues

@@ -28,14 +28,12 @@ from cognitive_cache.indexer.graph_builder import DependencyGraph
 
 @dataclass
 class WeightConfig:
-    """Weights for each signal. These are the tunable knobs."""
-
-    symbol_overlap: float = 0.40
+    symbol_overlap: float = 0.30
     graph_distance: float = 0.15
     change_recency: float = 0.10
     redundancy: float = 0.10
     embedding_sim: float = 0.15
-    file_role_prior: float = 0.10
+    file_role_prior: float = 0.20
 
 
 class ValueFunction:
@@ -48,11 +46,12 @@ class ValueFunction:
         recency_data: dict[str, float] | None = None,
         embedding_signal: EmbeddingSimilaritySignal | None = None,
         entry_points: set[str] | None = None,
+        is_shallow: bool = False,
     ):
         self.weights = weights or WeightConfig()
         self._symbol = SymbolOverlapSignal()
         self._graph = GraphDistanceSignal(graph) if graph else None
-        self._recency = ChangeRecencySignal(recency_data or {})
+        self._recency = ChangeRecencySignal(recency_data or {}, is_shallow=is_shallow)
         self._redundancy = RedundancySignal()
         self._embedding = embedding_signal or EmbeddingSimilaritySignal()
         self._role = FileRolePriorSignal()
