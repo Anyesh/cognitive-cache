@@ -148,23 +148,48 @@ uv run cognitive-cache select --repo . --task "fix login" --output ctx.txt # dum
 
 ### as an MCP server (for Claude Code, Cursor, etc.)
 
-```
-uv sync --extra mcp
-uv run cognitive-cache-mcp  # starts stdio server
+**Claude Code** — registers the server at user scope (available in all projects):
+
+```bash
+claude mcp add --scope user cognitive-cache -- uvx --from "cognitive-cache[mcp]" cognitive-cache-mcp
 ```
 
-Add to your Claude Code MCP settings:
+**Cursor / Windsurf / other editors** — add to your MCP config file:
 
 ```json
 {
   "mcpServers": {
     "cognitive-cache": {
-      "command": "uv",
-      "args": ["run", "--project", "/path/to/cognitive-cache", "--extra", "mcp", "cognitive-cache-mcp"]
+      "command": "uvx",
+      "args": ["--from", "cognitive-cache[mcp]", "cognitive-cache-mcp"]
     }
   }
 }
 ```
+
+#### telling the model when to use it
+
+The tool is most useful when the files relevant to a task aren't obvious — cross-cutting bugs, unfamiliar parts of a large codebase, tasks that span multiple layers. For small repos or tasks where you already know which files to touch, it doesn't add much over grep.
+
+Add this to your `CLAUDE.md` (or equivalent system prompt / rules file):
+
+```markdown
+## context selection
+
+When a task spans multiple files or you're not sure where to look, call `select_context_tool`
+from the `cognitive-cache` MCP server before reading files manually:
+
+- `repo_path`: absolute path to the repo root
+- `task`: specific description of the task — the more precise, the better the results
+- `budget`: token budget for returned context (default 12000; raise for complex tasks)
+
+The tool returns file contents directly. Use them instead of separate file reads.
+Call it at the start of investigation; the index is cached so follow-up calls are fast.
+
+Skip it when you already know which files to read.
+```
+
+A precise task description outperforms a vague one because symbol overlap and embedding similarity both depend on the exact words used. "users get 401 after OIDC callback when session token is present" will score better than "fix auth bug".
 
 ### as a GitHub Action
 
