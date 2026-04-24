@@ -1,6 +1,6 @@
 [project]
 name = "cognitive-cache"
-version = "0.1.0"
+version = "0.1.1"
 description = "Optimal context orchestration for LLMs"
 readme = "README.md"
 license = "MIT"
