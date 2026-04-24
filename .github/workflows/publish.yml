@@ -23,8 +23,6 @@ jobs:
       - run: uv build
 
       - uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          attestations: false
 
       - uses: softprops/action-gh-release@v2
         with:
