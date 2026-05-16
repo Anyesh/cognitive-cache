@@ -1,6 +1,6 @@
 [project]
 name = "cognitive-cache"
-version = "0.2.0"
+version = "0.2.1"
 description = "Optimal context orchestration for LLMs"
 readme = "README.md"
 license = "Apache-2.0"
