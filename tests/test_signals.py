@@ -215,3 +215,13 @@ def test_file_role_test_suppressed_for_non_testing_task():
     test_source = _make_source(path="tests/test_auth.py", is_test=True)
     task = _make_task(title="Fix login bug", body="Login endpoint returns 500")
     assert signal.score(test_source, task, []) <= 0.3
+
+
+def test_file_role_typing_import_not_type_definition():
+    signal = FileRolePriorSignal()
+    source = _make_source(
+        path="src/auth.py",
+        content="from typing import Optional\n\ndef login(user: str) -> Optional[str]:\n    return user\n",
+    )
+    task = _make_task()
+    assert signal.score(source, task, []) == 0.6

@@ -124,13 +124,11 @@ def chunk_source(source: Source, task: Task, max_tokens: int) -> Source:
     regions = _merge_regions(regions)
 
     if not regions:
-        # No specific regions found — take the first max_tokens worth
         chunks = []
-        total = 0
         for line in lines:
             chunks.append(line)
-            total = count_tokens("\n".join(chunks))
-            if total >= max_tokens:
+            if count_tokens("\n".join(chunks)) > max_tokens:
+                chunks.pop()
                 break
         content = "\n".join(chunks)
     else:
@@ -142,14 +140,12 @@ def chunk_source(source: Source, task: Task, max_tokens: int) -> Source:
 
         content = "\n".join(chunks)
 
-        # If still too large, truncate
         if count_tokens(content) > max_tokens:
             truncated = []
-            total = 0
             for line in content.split("\n"):
                 truncated.append(line)
-                total = count_tokens("\n".join(truncated))
-                if total >= max_tokens:
+                if count_tokens("\n".join(truncated)) > max_tokens:
+                    truncated.pop()
                     break
             content = "\n".join(truncated)
 

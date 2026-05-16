@@ -35,7 +35,7 @@ def _classify_file_role(path: str, content: str) -> str:
         or basename.endswith("types.ts")
     ):
         return "type_definition"
-    if re.search(r"(typing|Protocol|TypedDict|interface\s+\w+)", content):
+    if re.search(r"(Protocol|TypedDict|TypeAlias|interface\s+\w+)", content):
         return "type_definition"
 
     if basename in ("config.py", "settings.py", "config.js", "config.ts"):

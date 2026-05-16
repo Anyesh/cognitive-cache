@@ -209,4 +209,4 @@ def test_chunker_preserves_is_test():
     task = _make_task(symbols=["login"])
     chunked = chunk_source(source, task, max_tokens=100)
     assert chunked.is_test is True
-    assert chunked.token_count < source.token_count
+    assert chunked.token_count <= 100
