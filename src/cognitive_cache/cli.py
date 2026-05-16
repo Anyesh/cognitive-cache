@@ -93,6 +93,24 @@ def main():
         "--budget", type=int, default=12000, help="Token budget (default: 12000)"
     )
     select_parser.add_argument(
+        "--max-files",
+        type=int,
+        default=15,
+        help="Maximum files to return (default: 15)",
+    )
+    select_parser.add_argument(
+        "--min-score",
+        type=float,
+        default=0.0,
+        help="Minimum score threshold (default: 0.0)",
+    )
+    select_parser.add_argument(
+        "--include-tests",
+        choices=["auto", "yes", "no"],
+        default="auto",
+        help="Include test files: auto (detect from task), yes, no (default: auto)",
+    )
+    select_parser.add_argument(
         "--json", action="store_true", dest="json_output", help="Output as JSON"
     )
     select_parser.add_argument("--output", help="Write full context to this file")
@@ -113,7 +131,17 @@ def main():
         print("No source files found.", file=sys.stderr)
         sys.exit(1)
 
-    result = select_context(index, args.task, budget=args.budget)
+    include_tests_map = {"auto": None, "yes": True, "no": False}
+    include_tests = include_tests_map[args.include_tests]
+
+    result = select_context(
+        index,
+        args.task,
+        budget=args.budget,
+        include_tests=include_tests,
+        max_files=args.max_files,
+        min_score=args.min_score,
+    )
 
     if not result.selected:
         print("No files selected.", file=sys.stderr)

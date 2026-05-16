@@ -1,10 +1,14 @@
 # cognitive-cache
 
+[![PyPI](https://img.shields.io/pypi/v/cognitive-cache)](https://pypi.org/project/cognitive-cache/)
+[![Python 3.11+](https://img.shields.io/pypi/pyversions/cognitive-cache)](https://pypi.org/project/cognitive-cache/)
+[![License](https://img.shields.io/pypi/l/cognitive-cache)](LICENSE)
+
 Every LLM tool right now (Cursor, Claude Code, Copilot, all of them) decides what to put in the context window using heuristics: grep for some symbols, embed and cosine-similarity search, or just cram as many files as will fit. Nobody has an actual algorithm for this.
 
 This project is an attempt to build one.
 
-**No any LLM calls or API keys or cloud. It runs entirely local.**
+**Runs entirely local with no LLM calls, API keys, or cloud dependencies, and supports Python, JavaScript, TypeScript, Go, Rust, Java, Ruby, C, and C++.**
 
 ![cognitive-cache finding the right files for a real GitHub issue](demo/demo.gif)
 
@@ -28,7 +32,7 @@ Cognitive-cache is building the "virtual memory" for LLM reasoning.
 
 ## what it does
 
-Given a task (like a GitHub issue) and a codebase, cognitive-cache picks which files to include in the LLM's context window. It combines multiple signals (symbol matching, dependency graph distance, git recency, semantic similarity, redundancy penalties) into a scoring function and runs greedy submodular optimization to select the highest-value set of files that fits within a token budget.
+Given a task (like a GitHub issue) and a codebase, cognitive-cache picks which files to include in the LLM's context window across nine languages. It combines multiple signals (symbol matching, dependency graph distance, git recency, semantic similarity, redundancy penalties, file role awareness) into a scoring function and runs greedy submodular optimization to select the highest-value set of files that fits within a token budget.
 
 The key insight is treating context selection as a **constrained optimization problem** rather than a retrieval problem. RAG systems ask "what's most similar to the query?" but what you actually want is "what maximizes the chance the model gets this right?" Those are different questions.
 
@@ -104,16 +108,32 @@ Bold = best recall for that issue. All runs use Qwen 3.5 9B (Q4_K_M) via llama.c
 
 ## how it works
 
-Six signals score each file:
+Six signals score each file, with configurable weights:
 
-- **symbol overlap**: does this file define or mention identifiers from the task? Strongest signal when it fires, so it gets the highest weight
-- **graph distance**: how many imports away is this file from the ones the task mentions? Built with networkx from the dependency graph
-- **change recency**: files changed recently in git tend to be more relevant, and more likely to contain the bug
-- **redundancy penalty**: if you already selected a file with similar symbols, this one becomes less valuable, which prevents the algorithm from blowing the budget on five files from the same directory
-- **embedding similarity**: TF-IDF cosine similarity, essentially what RAG does. Weighted low because we're trying to beat this, not replicate it
-- **file role prior**: test files, type definitions, and config files get small baseline boosts since they tend to be informative
+| Signal | Weight | What it does |
+|---|---|---|
+| **symbol overlap** | 0.45 | Does this file define or mention identifiers from the task? Dominant signal when it fires |
+| **graph distance** | 0.20 | How many imports away from task-mentioned files? Built with networkx from the dependency graph (resolves imports for all nine languages, including TS path aliases from tsconfig.json) |
+| **change recency** | 0.03 | Recently changed in git? Only fires when the file also has structural relevance, to prevent recently-touched-but-unrelated files from flooding results |
+| **redundancy penalty** | 0.10 | Already selected a file with similar symbols? This one is worth less, preventing budget waste on duplicate context |
+| **embedding similarity** | 0.15 | TF-IDF cosine similarity between task and file content |
+| **file role prior** | 0.07 | Source files score higher than test files by default. Test files get boosted only when the task mentions testing |
 
-These get combined into a weighted score, and a greedy selector picks files one at a time, re-evaluating redundancy after each pick. If a file is too large to fit (like a 13K token app.py when your budget is 12K), it gets chunked to extract just the relevant functions.
+These get combined into a weighted score, and a two-phase greedy selector picks files: first by absolute score (core files), then by value-per-token (supporting context). Redundancy is re-evaluated after each pick. If a file is too large to fit (like a 13K token app.py when your budget is 12K), it gets chunked to extract just the relevant functions.
+
+Test files are automatically excluded unless the task mentions testing keywords (test, spec, coverage, fixture, mock, stub), though you can override this with `include_tests=True/False`.
+
+## install
+
+```bash
+pip install cognitive-cache
+```
+
+Or with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv add cognitive-cache
+```
 
 ## using it
 
@@ -137,13 +157,32 @@ r1 = select_context(index, "fix the login bug")
 r2 = select_context(index, "add rate limiting to the API")
 ```
 
+All the scoring parameters are exposed if you need control over them:
+
+```python
+from cognitive_cache import RepoIndex, select_context
+from cognitive_cache.core.value_function import WeightConfig
+
+index = RepoIndex.build(".")
+result = select_context(
+    index,
+    "add test coverage for the auth module",
+    budget=20000,
+    include_tests=True,
+    max_files=10,
+    min_score=0.15,
+    weights=WeightConfig(symbol_overlap=0.50, graph_distance=0.25),
+)
+```
+
 ### as a CLI
 
 ```
-uv sync
-uv run cognitive-cache select --repo . --task "fix the login redirect bug"
-uv run cognitive-cache select --repo . --task "fix login" --json          # machine-readable
-uv run cognitive-cache select --repo . --task "fix login" --output ctx.txt # dump context to file
+cognitive-cache select --repo . --task "fix the login redirect bug"
+cognitive-cache select --repo . --task "fix login" --json              # machine-readable
+cognitive-cache select --repo . --task "fix login" --output ctx.txt    # dump context to file
+cognitive-cache select --repo . --task "fix login" --include-tests no  # exclude test files
+cognitive-cache select --repo . --task "fix login" --max-files 5 --min-score 0.2
 ```
 
 ### as an MCP server (for Claude Code, Cursor, etc.)
@@ -169,7 +208,7 @@ claude mcp add --scope user cognitive-cache -- uvx --from "cognitive-cache[mcp]"
 
 #### telling the model when to use it
 
-The tool is most useful when the files relevant to a task aren't obvious — cross-cutting bugs, unfamiliar parts of a large codebase, tasks that span multiple layers. For small repos or tasks where you already know which files to touch, it doesn't add much over grep.
+The tool is most useful when the relevant files aren't obvious: cross-cutting bugs, unfamiliar parts of a large codebase, or tasks that span multiple layers. For small repos or tasks where you already know which files to touch, it doesn't add much over grep.
 
 Add this to your `CLAUDE.md` (or equivalent system prompt / rules file):
 
@@ -180,11 +219,14 @@ When a task spans multiple files or you're not sure where to look, call `select_
 from the `cognitive-cache` MCP server before reading files manually:
 
 - `repo_path`: absolute path to the repo root
-- `task`: specific description of the task — the more precise, the better the results
+- `task`: specific description of the task (the more precise, the better the results)
 - `budget`: token budget for returned context (default 12000; raise for complex tasks)
+- `include_tests`: true to always include test files, false to exclude, null for auto-detection
+- `max_files`: cap on number of files returned (default 15)
+- `min_score`: minimum relevance score threshold (default 0.0)
 
-The tool returns file contents directly. Use them instead of separate file reads.
-Call it at the start of investigation; the index is cached so follow-up calls are fast.
+The tool returns file contents directly, so use them instead of separate file reads.
+Call it at the start of investigation; the index is cached and follow-up calls are fast.
 
 Skip it when you already know which files to read.
 ```
@@ -199,7 +241,7 @@ The included workflow (`.github/workflows/context-suggest.yml`) automatically co
 
 ```
 uv sync --dev
-uv run pytest tests/  # 97 tests
+uv run pytest tests/  # 137 tests
 ```
 
 To run the benchmark with a local llama.cpp server:
@@ -243,10 +285,9 @@ benchmark/
 
 ## whats next
 
-- Weight tuning on a larger dataset, since the signal weights are currently hand-tuned
-- Improving the test-vs-source ranking for bug-fix tasks (the algorithm sometimes ranks test files above the source files that need fixing)
 - Adaptive replanning that re-optimizes context mid-conversation after the model calls a tool or asks a followup
 - Task-aware compression that goes beyond chunking to actually compress file content while preserving what's relevant
+- Expanding the benchmark dataset to include Go, Rust, and Java repositories now that multi-language indexing is in place
 
 ## why this matters
 

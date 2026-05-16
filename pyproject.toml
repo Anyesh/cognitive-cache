@@ -3,12 +3,12 @@ name = "cognitive-cache"
 version = "0.2.0"
 description = "Optimal context orchestration for LLMs"
 readme = "README.md"
-license = "MIT"
+license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "Anish Shrestha" }]
 classifiers = [
     "Development Status :: 3 - Alpha",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
