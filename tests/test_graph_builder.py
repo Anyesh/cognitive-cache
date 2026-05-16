@@ -1,3 +1,4 @@
+import json
 import os
 import tempfile
 
@@ -113,3 +114,101 @@ def test_undirected_cache_invalidated_on_add_file():
     # Adding file invalidates cache
     graph.add_file("b.py")
     assert graph._undirected is None
+
+
+def test_ts_alias_resolved_from_tsconfig():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        os.makedirs(os.path.join(tmpdir, "src"))
+        with open(os.path.join(tmpdir, "tsconfig.json"), "w") as f:
+            json.dump({"compilerOptions": {"paths": {"@/*": ["src/*"]}}}, f)
+        with open(os.path.join(tmpdir, "src", "app.ts"), "w") as f:
+            f.write('import { helper } from "@/utils";\n')
+        with open(os.path.join(tmpdir, "src", "utils.ts"), "w") as f:
+            f.write("export function helper() {}\n")
+
+        sources = index_repo(tmpdir)
+        graph = build_dependency_graph(sources, repo_path=tmpdir)
+
+        assert graph.has_edge("src/app.ts", "src/utils.ts")
+
+
+def test_ts_fallback_alias_without_tsconfig():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        os.makedirs(os.path.join(tmpdir, "src"))
+        with open(os.path.join(tmpdir, "src", "app.ts"), "w") as f:
+            f.write('import { helper } from "@/utils";\n')
+        with open(os.path.join(tmpdir, "src", "utils.ts"), "w") as f:
+            f.write("export function helper() {}\n")
+
+        sources = index_repo(tmpdir)
+        graph = build_dependency_graph(sources, repo_path=tmpdir)
+
+        assert graph.has_edge("src/app.ts", "src/utils.ts")
+
+
+def test_go_imports_detected():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        os.makedirs(os.path.join(tmpdir, "auth"))
+        with open(os.path.join(tmpdir, "main.go"), "w") as f:
+            f.write('package main\n\nimport "myapp/auth"\n\nfunc main() {}\n')
+        with open(os.path.join(tmpdir, "auth", "service.go"), "w") as f:
+            f.write("package auth\n\nfunc Authenticate() {}\n")
+
+        sources = index_repo(tmpdir)
+        graph = build_dependency_graph(sources)
+
+        assert graph.has_edge("main.go", "auth/service.go")
+
+
+def test_rust_mod_detected():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with open(os.path.join(tmpdir, "main.rs"), "w") as f:
+            f.write("mod auth;\n\nfn main() {}\n")
+        with open(os.path.join(tmpdir, "auth.rs"), "w") as f:
+            f.write("pub fn login() {}\n")
+
+        sources = index_repo(tmpdir)
+        graph = build_dependency_graph(sources)
+
+        assert graph.has_edge("main.rs", "auth.rs")
+
+
+def test_java_import_detected():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        os.makedirs(os.path.join(tmpdir, "com", "example"))
+        with open(os.path.join(tmpdir, "App.java"), "w") as f:
+            f.write("import com.example.UserService;\n\npublic class App {}\n")
+        with open(os.path.join(tmpdir, "com", "example", "UserService.java"), "w") as f:
+            f.write("package com.example;\n\npublic class UserService {}\n")
+
+        sources = index_repo(tmpdir)
+        graph = build_dependency_graph(sources)
+
+        assert graph.has_edge("App.java", "com/example/UserService.java")
+
+
+def test_ruby_require_relative_detected():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        os.makedirs(os.path.join(tmpdir, "lib"))
+        with open(os.path.join(tmpdir, "app.rb"), "w") as f:
+            f.write("require_relative 'lib/auth'\n")
+        with open(os.path.join(tmpdir, "lib", "auth.rb"), "w") as f:
+            f.write("class Auth; end\n")
+
+        sources = index_repo(tmpdir)
+        graph = build_dependency_graph(sources)
+
+        assert graph.has_edge("app.rb", "lib/auth.rb")
+
+
+def test_c_include_detected():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with open(os.path.join(tmpdir, "main.c"), "w") as f:
+            f.write('#include "utils.h"\n\nint main() { return 0; }\n')
+        with open(os.path.join(tmpdir, "utils.h"), "w") as f:
+            f.write("int helper(int x);\n")
+
+        sources = index_repo(tmpdir)
+        graph = build_dependency_graph(sources)
+
+        assert graph.has_edge("main.c", "utils.h")

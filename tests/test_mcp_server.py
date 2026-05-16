@@ -71,3 +71,58 @@ def test_handle_select_context_nonexistent_repo():
     _index_cache.clear()
     with pytest.raises(FileNotFoundError):
         _handle_select_context("/nonexistent/path", "fix bug", 12000)
+
+
+def test_handle_select_context_returns_metadata():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        _create_fake_repo(tmpdir)
+        _index_cache.clear()
+
+        result = _handle_select_context(tmpdir, "fix login", 12000)
+
+        first = result["files"][0]
+        assert "language" in first
+        assert "is_test" in first
+        assert first["language"] == "python"
+        assert first["is_test"] is False
+
+
+def test_handle_select_context_excludes_tests():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        _create_fake_repo(tmpdir)
+        os.makedirs(os.path.join(tmpdir, "tests"), exist_ok=True)
+        with open(os.path.join(tmpdir, "tests", "test_auth.py"), "w") as f:
+            f.write("def test_login(): assert True\n")
+        subprocess.run(["git", "add", "."], cwd=tmpdir, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "add tests"], cwd=tmpdir, capture_output=True
+        )
+        _index_cache.clear()
+
+        result = _handle_select_context(
+            tmpdir, "fix login bug", 12000, include_tests=False
+        )
+
+        paths = [f["path"] for f in result["files"]]
+        assert all("test_" not in p for p in paths)
+
+
+def test_handle_select_context_max_files():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        _create_fake_repo(tmpdir)
+        _index_cache.clear()
+
+        result = _handle_select_context(tmpdir, "fix login", 12000, max_files=1)
+
+        assert len(result["files"]) <= 1
+
+
+def test_handle_select_context_min_score():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        _create_fake_repo(tmpdir)
+        _index_cache.clear()
+
+        result = _handle_select_context(tmpdir, "fix login", 12000, min_score=0.99)
+
+        for f in result["files"]:
+            assert f["score"] >= 0.99

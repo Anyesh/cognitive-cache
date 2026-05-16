@@ -28,19 +28,15 @@ from cognitive_cache.indexer.graph_builder import DependencyGraph
 
 @dataclass
 class WeightConfig:
-    """Weights for each signal. These are the tunable knobs."""
-
-    symbol_overlap: float = 0.40
-    graph_distance: float = 0.15
-    change_recency: float = 0.10
+    symbol_overlap: float = 0.45
+    graph_distance: float = 0.20
+    change_recency: float = 0.03
     redundancy: float = 0.10
     embedding_sim: float = 0.15
-    file_role_prior: float = 0.10
+    file_role_prior: float = 0.07
 
 
 class ValueFunction:
-    """Combines all scoring signals into a single value score."""
-
     def __init__(
         self,
         weights: WeightConfig | None = None,
@@ -59,18 +55,17 @@ class ValueFunction:
         self._entry_points = entry_points or set()
 
     def score(self, source: Source, task: Task, selected: list[Source]) -> float:
-        """Compute the combined value score for a candidate source."""
         score, _ = self.score_with_breakdown(source, task, selected)
         return score
 
     def score_with_breakdown(
         self, source: Source, task: Task, selected: list[Source]
     ) -> tuple[float, dict[str, float]]:
-        """Compute value score and return per-signal breakdown."""
         w = self.weights
         breakdown = {}
 
         breakdown["symbol_overlap"] = self._symbol.score(source, task, selected)
+        breakdown["embedding_sim"] = self._embedding.score(source, task, selected)
 
         if self._graph:
             breakdown["graph_distance"] = self._graph.score(
@@ -79,9 +74,14 @@ class ValueFunction:
         else:
             breakdown["graph_distance"] = 0.0
 
-        breakdown["change_recency"] = self._recency.score(source, task, selected)
+        breakdown["change_recency"] = self._recency.score(
+            source,
+            task,
+            selected,
+            symbol_overlap_score=breakdown["symbol_overlap"],
+            embedding_sim_score=breakdown["embedding_sim"],
+        )
         breakdown["redundancy"] = self._redundancy.score(source, task, selected)
-        breakdown["embedding_sim"] = self._embedding.score(source, task, selected)
         breakdown["file_role_prior"] = self._role.score(source, task, selected)
 
         combined = (

@@ -19,9 +19,11 @@ from cognitive_cache.indexer.repo_indexer import (
 from cognitive_cache.indexer.git_analyzer import GitAnalyzer
 from cognitive_cache.indexer.graph_builder import build_dependency_graph
 from cognitive_cache.signals.embedding_sim import EmbeddingSimilaritySignal
-from cognitive_cache.core.value_function import ValueFunction
+from cognitive_cache.core.value_function import ValueFunction, WeightConfig
 from cognitive_cache.core.selector import GreedySelector
 from cognitive_cache.core.orderer import order_context
+
+_TEST_KEYWORDS = {"test", "spec", "testing", "coverage", "fixture", "mock", "stub"}
 
 
 def _extract_task_symbols(
@@ -81,6 +83,12 @@ def _extract_task_symbols(
             if word in sym_lower:
                 matches.add(sym)
                 break
+
+    # Vague-task fallback: when no symbols matched, use long task words as
+    # pseudo-symbols so that symbol_overlap and graph_distance don't both
+    # zero out (which collapses 55% of scoring weight)
+    if not matches and task_words_long:
+        matches = set(list(task_words_long)[:10])
 
     return frozenset(matches)
 
@@ -147,7 +155,7 @@ class RepoIndex:
             raise FileNotFoundError(f"Repository path does not exist: {repo_path}")
 
         sources = index_repo(repo_path)
-        graph = build_dependency_graph(sources)
+        graph = build_dependency_graph(sources, repo_path=repo_path)
 
         git_analyzer = GitAnalyzer(repo_path)
         recency_data = git_analyzer.recency_scores()
@@ -198,7 +206,7 @@ class RepoIndex:
 
         # Something changed, so rebuild the index.
         sources = index_repo(self.repo_path)
-        graph = build_dependency_graph(sources)
+        graph = build_dependency_graph(sources, repo_path=self.repo_path)
         embedding_signal = EmbeddingSimilaritySignal()
         if sources:
             embedding_signal.fit(sources)
@@ -219,16 +227,30 @@ class RepoIndex:
         )
 
 
+def _task_mentions_testing(task: Task) -> bool:
+    return any(kw in task.full_text.lower() for kw in _TEST_KEYWORDS)
+
+
 def select_context(
     index: RepoIndex,
     task: str | Task,
     budget: int = 12_000,
+    weights: WeightConfig | None = None,
+    include_tests: bool | None = None,
+    max_files: int = 15,
+    min_score: float = 0.0,
 ) -> SelectionResult:
     """Select the most valuable context for a task from an indexed repo.
 
-    If *task* is a plain string it gets wrapped into a Task with symbols
-    extracted automatically. If it's already a Task object, its symbols
-    are used directly.
+    Args:
+        index: Pre-built repo index.
+        task: Plain text task description or Task object.
+        budget: Maximum token budget for selected context.
+        weights: Custom signal weights. None uses defaults.
+        include_tests: True=always include, False=always exclude,
+            None=auto-detect from task text (include only if task mentions testing).
+        max_files: Maximum number of files to return.
+        min_score: Minimum score threshold for returned files.
     """
     if not index.sources:
         return SelectionResult(selected=[], total_tokens=0, budget=budget)
@@ -237,14 +259,23 @@ def select_context(
         task_symbols = _extract_task_symbols(task, "", index.sources)
         task = Task(title=task, body="", symbols=task_symbols)
 
+    if include_tests is None:
+        include_tests = _task_mentions_testing(task)
+
     entry_points = _find_entry_points(task.symbols, index.sources)
     vf = ValueFunction(
+        weights=weights,
         graph=index.graph,
         recency_data=index.recency_data,
         embedding_signal=index.embedding_signal,
         entry_points=entry_points,
     )
-    selector = GreedySelector(value_function=vf)
+    selector = GreedySelector(
+        value_function=vf,
+        include_tests=include_tests,
+        max_files=max_files,
+        min_score=min_score,
+    )
     result = selector.select(index.sources, task, budget)
     result.selected = order_context(result.selected)
     return result
@@ -254,6 +285,10 @@ def select_context_from_repo(
     repo_path: str,
     task: str | Task,
     budget: int = 12_000,
+    weights: WeightConfig | None = None,
+    include_tests: bool | None = None,
+    max_files: int = 15,
+    min_score: float = 0.0,
 ) -> SelectionResult:
     """Convenience wrapper that builds an index and selects context in one call.
 
@@ -262,4 +297,12 @@ def select_context_from_repo(
     and call select_context directly.
     """
     index = RepoIndex.build(repo_path)
-    return select_context(index, task, budget)
+    return select_context(
+        index,
+        task,
+        budget,
+        weights=weights,
+        include_tests=include_tests,
+        max_files=max_files,
+        min_score=min_score,
+    )

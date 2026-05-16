@@ -19,6 +19,7 @@ class Source:
     token_count: int
     language: str
     symbols: frozenset[str] = field(default_factory=frozenset)
+    is_test: bool = False
 
     def __hash__(self):
         return hash(self.path)

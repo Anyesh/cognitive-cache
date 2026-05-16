@@ -8,13 +8,14 @@ from cognitive_cache.signals.file_role_prior import FileRolePriorSignal
 from cognitive_cache.indexer.graph_builder import DependencyGraph
 
 
-def _make_source(path="a.py", content="x = 1", symbols=None):
+def _make_source(path="a.py", content="x = 1", symbols=None, is_test=False):
     return Source(
         path=path,
         content=content,
         token_count=10,
         language="python",
         symbols=frozenset(symbols or []),
+        is_test=is_test,
     )
 
 
@@ -23,6 +24,7 @@ def _make_task(title="Fix bug", body="The login function fails", symbols=None):
 
 
 # --- Symbol Overlap ---
+
 
 def test_symbol_overlap_full_match():
     source = _make_source(symbols=["login", "authenticate"])
@@ -49,6 +51,7 @@ def test_symbol_overlap_no_match():
 
 
 # --- Graph Distance ---
+
 
 def test_graph_distance_direct_neighbor():
     graph = DependencyGraph()
@@ -77,6 +80,7 @@ def test_graph_distance_no_connection():
 
 # --- Change Recency ---
 
+
 def test_change_recency_with_scores():
     recency_data = {"recent.py": 1.0, "old.py": 0.2}
     signal = ChangeRecencySignal(recency_data)
@@ -94,7 +98,41 @@ def test_change_recency_unknown_file():
     assert signal.score(source, _make_task(), []) == 0.0
 
 
+def test_change_recency_gated_by_zero_relevance():
+    recency_data = {"hot_file.py": 1.0}
+    signal = ChangeRecencySignal(recency_data)
+    source = _make_source(path="hot_file.py")
+    task = _make_task()
+    score = signal.score(
+        source, task, [], symbol_overlap_score=0.0, embedding_sim_score=0.0
+    )
+    assert score == 0.0
+
+
+def test_change_recency_gated_by_noise_level_relevance():
+    recency_data = {"hot_file.py": 0.95}
+    signal = ChangeRecencySignal(recency_data)
+    source = _make_source(path="hot_file.py")
+    task = _make_task()
+    score = signal.score(
+        source, task, [], symbol_overlap_score=0.07, embedding_sim_score=0.02
+    )
+    assert score == 0.0
+
+
+def test_change_recency_passes_with_meaningful_relevance():
+    recency_data = {"hot_file.py": 0.8}
+    signal = ChangeRecencySignal(recency_data)
+    source = _make_source(path="hot_file.py")
+    task = _make_task()
+    score = signal.score(
+        source, task, [], symbol_overlap_score=0.15, embedding_sim_score=0.0
+    )
+    assert score == 0.8
+
+
 # --- Redundancy ---
+
 
 def test_redundancy_penalizes_similar():
     source = _make_source(path="auth2.py", symbols=["login", "validate"])
@@ -120,6 +158,7 @@ def test_redundancy_empty_selection():
 
 # --- Embedding Similarity ---
 
+
 def test_embedding_similarity_related_content():
     signal = EmbeddingSimilaritySignal()
     source = _make_source(content="def login(user, password): authenticate(user)")
@@ -141,9 +180,10 @@ def test_embedding_similarity_unrelated():
 
 # --- File Role Prior ---
 
+
 def test_file_role_test_file():
     signal = FileRolePriorSignal()
-    source = _make_source(path="tests/test_auth.py")
+    source = _make_source(path="tests/test_auth.py", is_test=True)
     score = signal.score(source, _make_task(), [])
     assert score > 0.0
 
@@ -155,9 +195,23 @@ def test_file_role_config_file():
     assert score > 0.0
 
 
-def test_file_role_regular_file():
+def test_file_role_source_scores_higher_than_test():
     signal = FileRolePriorSignal()
-    test_source = _make_source(path="tests/test_auth.py")
+    test_source = _make_source(path="tests/test_auth.py", is_test=True)
     regular_source = _make_source(path="src/utils.py")
     task = _make_task()
-    assert signal.score(test_source, task, []) != signal.score(regular_source, task, [])
+    assert signal.score(regular_source, task, []) > signal.score(test_source, task, [])
+
+
+def test_file_role_test_boosted_for_testing_task():
+    signal = FileRolePriorSignal()
+    test_source = _make_source(path="tests/test_auth.py", is_test=True)
+    task = _make_task(title="Add test coverage for auth", body="")
+    assert signal.score(test_source, task, []) >= 0.5
+
+
+def test_file_role_test_suppressed_for_non_testing_task():
+    signal = FileRolePriorSignal()
+    test_source = _make_source(path="tests/test_auth.py", is_test=True)
+    task = _make_task(title="Fix login bug", body="Login endpoint returns 500")
+    assert signal.score(test_source, task, []) <= 0.3

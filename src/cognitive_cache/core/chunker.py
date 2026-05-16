@@ -14,7 +14,9 @@ from cognitive_cache.models import Source, Task
 from cognitive_cache.indexer.token_counter import count_tokens
 
 
-def _find_relevant_regions(content: str, task_symbols: frozenset[str], language: str) -> list[tuple[int, int]]:
+def _find_relevant_regions(
+    content: str, task_symbols: frozenset[str], language: str
+) -> list[tuple[int, int]]:
     """Find line ranges in the file that contain task-relevant symbols.
 
     Returns list of (start_line, end_line) tuples.
@@ -46,7 +48,11 @@ def _find_relevant_regions(content: str, task_symbols: frozenset[str], language:
             elif block_start is not None:
                 # Check if we've left the block (dedented)
                 stripped = line.strip()
-                if stripped and not line.startswith(" " * (block_indent + 1)) and not stripped.startswith("#"):
+                if (
+                    stripped
+                    and not line.startswith(" " * (block_indent + 1))
+                    and not stripped.startswith("#")
+                ):
                     # Check indentation — if we're at same or less indent, block ended
                     current_indent = len(line) - len(line.lstrip())
                     if current_indent <= block_indent and stripped:
@@ -79,7 +85,9 @@ def _find_relevant_regions(content: str, task_symbols: frozenset[str], language:
     return regions
 
 
-def _merge_regions(regions: list[tuple[int, int]], margin: int = 3) -> list[tuple[int, int]]:
+def _merge_regions(
+    regions: list[tuple[int, int]], margin: int = 3
+) -> list[tuple[int, int]]:
     """Merge overlapping or nearby regions."""
     if not regions:
         return []
@@ -130,7 +138,7 @@ def chunk_source(source: Source, task: Task, max_tokens: int) -> Source:
         chunks = [f"# [Cognitive Cache: showing relevant sections of {source.path}]"]
         for start, end in regions:
             chunks.append(f"\n# ... (line {start + 1})")
-            chunks.extend(lines[start:end + 1])
+            chunks.extend(lines[start : end + 1])
 
         content = "\n".join(chunks)
 
@@ -152,4 +160,5 @@ def chunk_source(source: Source, task: Task, max_tokens: int) -> Source:
         token_count=new_token_count,
         language=source.language,
         symbols=source.symbols,
+        is_test=source.is_test,
     )

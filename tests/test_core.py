@@ -2,18 +2,28 @@ from cognitive_cache.models import Source, Task, ScoredSource
 from cognitive_cache.core.value_function import ValueFunction
 from cognitive_cache.core.selector import GreedySelector
 from cognitive_cache.core.orderer import order_context
+from cognitive_cache.core.chunker import chunk_source
 
 
-def _make_source(path, content="x = 1", tokens=10, symbols=None):
-    return Source(path=path, content=content, token_count=tokens,
-                  language="python", symbols=frozenset(symbols or []))
+def _make_source(path, content="x = 1", tokens=10, symbols=None, is_test=False):
+    return Source(
+        path=path,
+        content=content,
+        token_count=tokens,
+        language="python",
+        symbols=frozenset(symbols or []),
+        is_test=is_test,
+    )
 
 
 def _make_task(symbols=None):
-    return Task(title="Fix bug", body="login fails", symbols=frozenset(symbols or ["login"]))
+    return Task(
+        title="Fix bug", body="login fails", symbols=frozenset(symbols or ["login"])
+    )
 
 
 # --- Value Function ---
+
 
 def test_value_function_scores_relevant_higher():
     relevant = _make_source("auth.py", symbols=["login", "authenticate"])
@@ -52,6 +62,7 @@ def test_value_function_returns_signal_breakdown():
 
 
 # --- Selector ---
+
 
 def test_selector_respects_budget():
     sources = [
@@ -99,7 +110,9 @@ def test_selector_stops_at_threshold():
     ]
     task = _make_task(symbols=["login"])
 
-    selector = GreedySelector(value_function=ValueFunction(), score_threshold=0.3, vpt_threshold=0.01)
+    selector = GreedySelector(
+        value_function=ValueFunction(), score_threshold=0.3, vpt_threshold=0.01
+    )
     result = selector.select(sources, task, budget=1000)
 
     # b.py and c.py have no symbol overlap — below both thresholds
@@ -107,6 +120,7 @@ def test_selector_stops_at_threshold():
 
 
 # --- Orderer ---
+
 
 def test_orderer_puts_highest_score_first():
     scored = [
@@ -120,8 +134,79 @@ def test_orderer_puts_highest_score_first():
 
 def test_orderer_puts_tests_last():
     scored = [
-        ScoredSource(_make_source("tests/test_auth.py"), score=0.9, signal_scores={}),
+        ScoredSource(
+            _make_source("tests/test_auth.py", is_test=True),
+            score=0.9,
+            signal_scores={},
+        ),
         ScoredSource(_make_source("auth.py"), score=0.9, signal_scores={}),
     ]
     ordered = order_context(scored)
     assert ordered[-1].source.path == "tests/test_auth.py"
+
+
+def test_selector_excludes_test_files():
+    sources = [
+        _make_source("auth.py", tokens=10, symbols=["login"]),
+        _make_source("tests/test_auth.py", tokens=10, symbols=["login"], is_test=True),
+    ]
+    task = _make_task(symbols=["login"])
+
+    selector = GreedySelector(value_function=ValueFunction(), include_tests=False)
+    result = selector.select(sources, task, budget=1000)
+
+    paths = [ss.source.path for ss in result.selected]
+    assert "auth.py" in paths
+    assert "tests/test_auth.py" not in paths
+
+
+def test_selector_includes_test_files_by_default():
+    sources = [
+        _make_source("auth.py", tokens=10, symbols=["login"]),
+        _make_source("tests/test_auth.py", tokens=10, symbols=["login"], is_test=True),
+    ]
+    task = _make_task(symbols=["login"])
+
+    selector = GreedySelector(value_function=ValueFunction())
+    result = selector.select(sources, task, budget=1000)
+
+    paths = [ss.source.path for ss in result.selected]
+    assert "tests/test_auth.py" in paths
+
+
+def test_selector_respects_min_score():
+    sources = [
+        _make_source("auth.py", tokens=10, symbols=["login"]),
+        _make_source("unrelated.py", tokens=10, symbols=[]),
+    ]
+    task = _make_task(symbols=["login"])
+
+    selector = GreedySelector(value_function=ValueFunction(), min_score=0.3)
+    result = selector.select(sources, task, budget=1000)
+
+    paths = [ss.source.path for ss in result.selected]
+    assert "auth.py" in paths
+    assert "unrelated.py" not in paths
+
+
+def test_selector_respects_max_files():
+    sources = [
+        _make_source(f"file{i}.py", tokens=10, symbols=["login"]) for i in range(10)
+    ]
+    task = _make_task(symbols=["login"])
+
+    selector = GreedySelector(value_function=ValueFunction(), max_files=3)
+    result = selector.select(sources, task, budget=10000)
+
+    assert len(result.selected) == 3
+
+
+def test_chunker_preserves_is_test():
+    large_content = "def test_login():\n" + "    assert True\n" * 500
+    source = _make_source(
+        "tests/test_auth.py", content=large_content, tokens=1000, is_test=True
+    )
+    task = _make_task(symbols=["login"])
+    chunked = chunk_source(source, task, max_tokens=100)
+    assert chunked.is_test is True
+    assert chunked.token_count < source.token_count
